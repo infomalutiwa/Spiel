@@ -16,13 +16,14 @@ const MIME: Record<string, string> = {
 };
 
 const COMPRESSIBLE = new Set(['.html', '.js', '.css', '.json', '.gltf', '.bin', '.glb', '.svg', '.wasm']);
-const gzCache = new Map<string, Buffer>();
+const gzCache = new Map<string, { key: string; z: Buffer }>();
 const send = (req: IncomingMessage, res: ServerResponse, file: string, data: Buffer, type: string) => {
   const gz = COMPRESSIBLE.has(extname(file)) && data.length > 1024 && /\bgzip\b/.test(String(req.headers['accept-encoding'] ?? ''));
   const headers: Record<string, string> = { 'content-type': type, 'cache-control': file.includes('/assets/') && !file.endsWith('index.html') ? 'public, max-age=3600' : 'no-cache' };
   if (!gz) { res.writeHead(200, headers); return res.end(data); }
-  let z = gzCache.get(file);
-  if (!z) { z = gzipSync(data, { level: 6 }); if (gzCache.size < 400) gzCache.set(file, z); }
+  const key = `${data.length}:${data[0]}:${data[data.length - 1]}:${data[data.length >> 1]}`; // cheap content fingerprint: a rebuild never serves stale bytes
+  let z = gzCache.get(file)?.z;
+  if (!z || gzCache.get(file)!.key !== key) { z = gzipSync(data, { level: 6 }); if (gzCache.size < 400) gzCache.set(file, { key, z }); }
   res.writeHead(200, { ...headers, 'content-encoding': 'gzip', vary: 'accept-encoding' });
   res.end(z);
 };
@@ -37,6 +38,7 @@ const http = createServer(async (req, res) => {
     const data = await readFile(file);
     send(req, res, file, data, MIME[extname(file)] ?? 'application/octet-stream');
   } catch {
+    if (extname(url.pathname)) { res.writeHead(404); return res.end('not found'); } // a missing asset must be a 404, not index.html
     try {
       const idx = join(DIST, 'index.html');
       send(req, res, idx, await readFile(idx), MIME['.html']);
@@ -65,7 +67,18 @@ setInterval(() => {
   }
 }, 8_000).unref();
 
-wss.on('connection', (ws: WebSocket) => {
+// room creation is rate-limited per client address (behind Cloud Run / proxies the real address is in x-forwarded-for)
+const creates = new Map<string, number[]>();
+const mayCreate = (ip: string) => {
+  const now = Date.now(), list = (creates.get(ip) ?? []).filter(t => now - t < 10 * 60_000);
+  if (list.length >= 12) { creates.set(ip, list); return false; }
+  list.push(now); creates.set(ip, list);
+  if (creates.size > 5000) for (const [k, v] of creates) if (!v.some(t => now - t < 10 * 60_000)) creates.delete(k);
+  return true;
+};
+
+wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
+  const ip = String(req.headers['x-forwarded-for'] ?? req.socket.remoteAddress ?? '?').split(',')[0].trim();
   let seat: { room: Room; you: PlayerId } | null = null;
   alive.add(ws);
   ws.on('pong', () => alive.add(ws));
@@ -81,6 +94,7 @@ wss.on('connection', (ws: WebSocket) => {
       if (!msg || typeof msg !== 'object') return err('bad_message');
       let room: Room | undefined | null;
       if (msg.t === 'create') {
+        if (!mayCreate(ip)) return err('too_many_rooms');
         room = rooms.create(typeof msg.mapId === 'string' ? msg.mapId : undefined);
         if (!room) return err('server_full');
       } else if (msg.t === 'join') {

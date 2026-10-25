@@ -115,6 +115,10 @@ window.SPECS = [
     attach: [{ bone: 'handslotr', file: SKEL + 'Assets/gltf/Skeleton_Crossbow.gltf' }, { bone: 'chest', file: SKEL + 'Assets/gltf/Skeleton_Quiver.gltf', pos: [0, 0.12, -0.22], rot: [0, Math.PI, 0.25] }],
     clips: { idle: IDLE, walk: WALK, attack: { name: '1H_Ranged_Shoot', frames: 8, mode: 'once' }, death: DEATH },
   }),
+  mk('ironguard', SKEL + 'Characters/gltf/Skeleton_Warrior.glb', {
+    attach: [{ bone: 'handslotr', file: SKEL + 'Assets/gltf/Skeleton_Blade.gltf' }, { bone: 'handslotl', file: SKEL + 'Assets/gltf/Skeleton_Shield_Large_B.gltf' }],
+    clips: { idle: IDLE, walk: { name: 'Walking_B', frames: 8 }, attack: { name: '1H_Melee_Attack_Slice_Horizontal', frames: 8, mode: 'once' }, death: DEATH },
+  }),
   mk('shaman', SKEL + 'Characters/gltf/Skeleton_Mage.glb', {
     attach: [{ bone: 'handslotr', file: SKEL + 'Assets/gltf/Skeleton_Staff.gltf' }],
     clips: { idle: IDLE, walk: WALK, attack: { name: 'Spellcast_Raise', frames: 8, mode: 'once' }, death: DEATH },

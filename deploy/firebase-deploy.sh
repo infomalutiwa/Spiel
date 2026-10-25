@@ -12,10 +12,11 @@ echo "› enabling APIs"
 gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com --project "$PROJECT"
 
 echo "› deploying the game server to Cloud Run ($REGION)"
-# Rooms live in memory, so exactly one always-on instance. WebSockets stay open up to an hour; clients reconnect automatically.
+# Rooms live in memory, so exactly one always-on instance (a redeploy resets all running games). Every open WebSocket counts as one
+# request, hence the high concurrency; Cloud Run cuts sockets after --timeout (1 h) and clients reconnect automatically.
 gcloud run deploy "$SERVICE" --source . --project "$PROJECT" --region "$REGION" \
   --allow-unauthenticated --min-instances 1 --max-instances 1 --no-cpu-throttling \
-  --cpu 1 --memory 1Gi --timeout 3600 --concurrency 250 \
+  --cpu 1 --memory 1Gi --timeout 3600 --concurrency 1000 \
   --set-env-vars "ALLOWED_ORIGINS=https://${PROJECT}.web.app,https://${PROJECT}.firebaseapp.com"
 URL="$(gcloud run services describe "$SERVICE" --project "$PROJECT" --region "$REGION" --format 'value(status.url)')"
 echo "  server: $URL"

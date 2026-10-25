@@ -10,7 +10,7 @@ const REASONS: Record<string, string> = {
   not_enough_gold: 'Nicht genug Gold', outside_zone: 'Hier darfst du nicht aufstellen – nimm die helle Fläche',
   not_prep: 'Nur in der Aufstellphase', not_battle: 'Nur im Kampf', cooldown: 'Fähigkeit lädt noch',
   bad_command: 'Das geht so nicht', room_full: 'Der Raum ist schon voll', room_not_found: 'Diesen Raum gibt es nicht',
-  connection_failed: 'Keine Verbindung zum Server', server_full: 'Der Server ist gerade voll – versucht es gleich nochmal', bad_message: 'Das hat nicht geklappt',
+  connection_failed: 'Keine Verbindung zum Server', too_many_rooms: 'Zu viele neue Spiele in kurzer Zeit – kurz warten', server_full: 'Der Server ist gerade voll – versucht es gleich nochmal', bad_message: 'Das hat nicht geklappt',
 };
 export const reasonText = (r: string) => REASONS[r] ?? r;
 

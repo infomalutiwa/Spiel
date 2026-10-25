@@ -52,8 +52,12 @@ class Buckets {
     let m = this.meshes[frame];
     const n = this.counts[frame];
     if (n >= m.instanceMatrix.count) { // grow: replace the bucket with a bigger one
-      this.parent.remove(m); m.dispose();
-      m = this.make(frame, m.instanceMatrix.count * 2);
+      const old = m;
+      this.parent.remove(old);
+      m = this.make(frame, old.instanceMatrix.count * 2);
+      m.instanceMatrix.array.set(old.instanceMatrix.array); // keep what was already written this frame
+      m.instanceColor!.array.set(old.instanceColor!.array);
+      old.dispose();
       this.meshes[frame] = m;
     }
     m.setMatrixAt(n, matrix); m.setColorAt(n, color);
@@ -78,6 +82,7 @@ export class UnitViews {
   private models = new Map<UnitType, Buckets>();
   private loading = new Set<UnitType>();
   private ghosts: Ghost[] = [];
+  private wrecks: { obj: THREE.Object3D; t: number }[] = [];
   private mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.82, metalness: 0 });
   private teamRings: THREE.InstancedMesh;
   private selRings: THREE.InstancedMesh;
@@ -105,9 +110,9 @@ export class UnitViews {
     this.teamRings = inst(ringGeo, new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.6, depthWrite: false, side: THREE.DoubleSide }), 1500, 1);
     this.selRings = inst(ringGeo, new THREE.MeshBasicMaterial({ color: '#ffe27a', transparent: true, opacity: 0.95, depthWrite: false, side: THREE.DoubleSide }), 400, 5);
     const barMat = (c: THREE.ColorRepresentation, o = 0.85) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: o, depthTest: false, side: THREE.DoubleSide });
-    this.barBg = inst(quad, barMat('#2b2230', 0.75), 500, 10);
-    this.barFill = inst(quad, barMat('#ffffff', 1), 500, 11);
-    this.pips = inst(pipGeo, new THREE.MeshBasicMaterial({ color: '#ffd75e', depthTest: false, transparent: true }), 600, 12);
+    this.barBg = inst(quad, barMat('#2b2230', 0.75), 1000, 10);
+    this.barFill = inst(quad, barMat('#ffffff', 1), 1000, 11);
+    this.pips = inst(pipGeo, new THREE.MeshBasicMaterial({ color: '#ffd75e', depthTest: false, transparent: true }), 1200, 12);
     this.hover = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.8, depthWrite: false, side: THREE.DoubleSide }));
     this.hover.rotation.x = -Math.PI / 2; this.hover.visible = false; this.hover.renderOrder = 6;
     this.group.add(this.hover);
@@ -162,8 +167,10 @@ export class UnitViews {
       v.px = nx; v.py = ny; v.snap = b;
     }
     for (const [id, v] of this.views) if (!seen.has(id)) {
-      if (v.snap.hp > 0 || true) this.ghosts.push({ type: v.snap.type, owner: v.snap.owner, side: v.snap.side, x: v.px, y: v.py, yaw: v.yaw, t: 0, level: v.snap.level });
-      if (v.obj) { this.group.remove(v.obj); }
+      this.ghosts.push({ type: v.snap.type, owner: v.snap.owner, side: v.snap.side, x: v.px, y: v.py, yaw: v.yaw, t: 0, level: v.snap.level });
+      if (v.obj) { // wrecked siege machine: shrink away like fallen soldiers do (shares geometry with the cache, so no dispose)
+        this.wrecks.push({ obj: v.obj, t: 0 });
+      }
       this.views.delete(id);
     }
     this.draw(you, selected, dt);
@@ -226,7 +233,7 @@ export class UnitViews {
         nSel++;
       }
       // health bar for hurt, selected or hovered units
-      if ((u.hp < u.maxHp || sel || this.hoverId === u.id) && nBar < 500) {
+      if ((u.hp < u.maxHp || sel || this.hoverId === u.id) && nBar < 1000) {
         const h = ((baked?.model.height ?? 3) * (SCALE[u.type] ?? 1)) + 0.7;
         const w = (def.radius * 1.5 + 1.2) * barScale, th = 0.3 * barScale;
         const f = Math.max(0, Math.min(1, u.hp / u.maxHp));
@@ -238,7 +245,7 @@ export class UnitViews {
         this.barFill.setMatrixAt(nBar, m);
         this.barFill.setColorAt(nBar, f > 0.55 ? this.tmpC.set('#7be09a') : f > 0.25 ? this.tmpC.set('#f6c85f') : this.tmpC.set('#ee6b6b'));
         nBar++;
-        for (let i = 0; i < u.level - 1 && nPip < 600; i++) {
+        for (let i = 0; i < u.level - 1 && nPip < 1200; i++) {
           const pp = new THREE.Vector3(v.px, y + h + 0.55 * barScale, v.py)
             .add(new THREE.Vector3((i - (u.level - 2) / 2) * 0.55 * barScale, 0, 0).applyQuaternion(camQ));
           s.setScalar(0.4 * barScale); m.compose(pp, camQ, s); this.pips.setMatrixAt(nPip, m); this.pips.setColorAt(nPip, this.tmpC.set(1, 1, 1)); nPip++;
@@ -265,6 +272,12 @@ export class UnitViews {
       m.compose(p.set(g.x, this.world.height(g.x, g.y) - (1 - shrink) * 0.4, g.y), q, s);
       col.copy(this.tintFor(g, you)).multiplyScalar(g.t < 0.25 ? 1.8 - g.t * 3 : 0.8);
       baked.add(baked.model.clips.death[0] + f, m, col);
+    }
+    for (let i = this.wrecks.length - 1; i >= 0; i--) {
+      const w = this.wrecks[i];
+      w.t += dt;
+      w.obj.rotation.z = Math.min(0.5, w.t * 1.2); w.obj.scale.setScalar(Math.max(0.01, 1 - Math.max(0, w.t - 1.2) / 0.8));
+      if (w.t > 2) { this.group.remove(w.obj); this.wrecks.splice(i, 1); }
     }
     for (const b of this.models.values()) b.end();
     for (const [im, n] of [[this.teamRings, nTeam], [this.selRings, nSel], [this.barBg, nBar], [this.barFill, nBar], [this.pips, nPip]] as const) {

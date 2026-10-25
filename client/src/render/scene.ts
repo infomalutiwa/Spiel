@@ -186,9 +186,9 @@ export class World {
   }
 
   /** instanced scatter of a model; `targetH` is the model's height in world units */
-  private async instanced(name: string, targetH: number, spots: Spot[], shadows = targetH > 1.2) {
+  private async instanced(into: THREE.Group, name: string, targetH: number, spots: Spot[], shadows = targetH > 1.2) {
     const src = await loadModel(name);
-    if (!src || !spots.length) return;
+    if (!src || !spots.length || into !== this.content) return; // map was swapped while the model loaded
     src.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(src);
     const k = targetH / Math.max(0.001, box.max.y - box.min.y);
@@ -204,12 +204,11 @@ export class World {
         inst.setMatrixAt(i, m4);
       });
       inst.castShadow = shadows; inst.receiveShadow = true; inst.frustumCulled = false;
-      this.content.add(inst);
+      into.add(inst);
     }
   }
 
   private async buildDecor(into: THREE.Group) {
-    void into;
     const m = this.map, R = rng(m.decorSeed);
     const area = (m.width * m.depth) / (240 * 150);
     const place = (n: number, ok: (x: number, z: number) => boolean, size: [number, number], pad = 130): Spot[] => {
@@ -230,12 +229,12 @@ export class World {
     // framing: forests and mountains beyond the rim
     const rimOk = (x: number, z: number) => outside(x, z, 6);
     const clumps = ['hex/trees_A_large', 'hex/trees_B_large', 'hex/trees_A_medium', 'hex/trees_B_medium'];
-    clumps.forEach(n => void this.instanced(n, 9, place(Math.round(46 * dense * Math.sqrt(area)), rimOk, [0.9, 1.5])));
-    ['hex/tree_single_A', 'hex/tree_single_B'].forEach(n => void this.instanced(n, 11, place(Math.round(30 * dense * area), (x, z) => rimOk(x, z) || (m.theme === 'forest' && inField(x, z, 4) && !onRoad(x, z, 9) && !inZone(x, z) && !nearCastle(x, z, 30)), [0.8, 1.4])));
-    ['hex/mountain_A_grass_trees', 'hex/mountain_B_grass_trees', 'hex/mountain_C_grass_trees', 'hex/mountain_A_grass'].forEach(n => void this.instanced(n, m.theme === 'valley' ? 62 : 44, place(Math.round(9 * area), (x, z) => outside(x, z, 60) && outside(x, z, 60), [0.8, 1.5], 280)));
-    ['hex/hills_A_trees', 'hex/hills_B_trees', 'hex/hills_C_trees', 'hex/hills_A'].forEach(n => void this.instanced(n, 15, place(Math.round(16 * area), (x, z) => outside(x, z, 22) && !outside(x, z, 120), [0.9, 1.7], 200)));
+    clumps.forEach(n => void this.instanced(into, n, 9, place(Math.round(46 * dense * Math.sqrt(area)), rimOk, [0.9, 1.5])));
+    ['hex/tree_single_A', 'hex/tree_single_B'].forEach(n => void this.instanced(into, n, 11, place(Math.round(30 * dense * area), (x, z) => rimOk(x, z) || (m.theme === 'forest' && inField(x, z, 4) && !onRoad(x, z, 9) && !inZone(x, z) && !nearCastle(x, z, 30)), [0.8, 1.4])));
+    ['hex/mountain_A_grass_trees', 'hex/mountain_B_grass_trees', 'hex/mountain_C_grass_trees', 'hex/mountain_A_grass'].forEach(n => void this.instanced(into, n, m.theme === 'valley' ? 62 : 44, place(Math.round(9 * area), (x, z) => outside(x, z, 60) && outside(x, z, 60), [0.8, 1.5], 280)));
+    ['hex/hills_A_trees', 'hex/hills_B_trees', 'hex/hills_C_trees', 'hex/hills_A'].forEach(n => void this.instanced(into, n, 15, place(Math.round(16 * area), (x, z) => outside(x, z, 22) && !outside(x, z, 120), [0.9, 1.7], 200)));
     // forests also creep into the corners of the playfield
-    void this.instanced('hex/trees_A_large', 9, place(Math.round(24 * dense * area), (x, z) => inField(x, z, 3) && (Math.min(z, m.depth - z) < 22 || (m.theme === 'forest' && Math.min(x, m.width - x) > 40 && Math.abs(z - m.depth / 2) > 50)) && !onRoad(x, z, 12) && !inZone(x, z) && !nearCastle(x, z, 40), [0.8, 1.3]));
+    void this.instanced(into, 'hex/trees_A_large', 9, place(Math.round(24 * dense * area), (x, z) => inField(x, z, 3) && (Math.min(z, m.depth - z) < 22 || (m.theme === 'forest' && Math.min(x, m.width - x) > 40 && Math.abs(z - m.depth / 2) > 50)) && !onRoad(x, z, 12) && !inZone(x, z) && !nearCastle(x, z, 40), [0.8, 1.3]));
 
     // villages & outposts: cozy buildings off the roads
     const colors = m.theme === 'valley' ? ['green', 'red'] : ['blue', 'red', 'green'];
@@ -252,7 +251,7 @@ export class World {
       const byName = new Map<string, Spot[]>();
       for (const sp of spots) byName.set(sp.name, [...(byName.get(sp.name) ?? []), sp.spot]);
       for (const [nm, list] of byName)
-        void this.instanced(nm, heights[nm.replace(/^hex\/building_/, '').replace(/_(blue|red|green)$/, '')] ?? 6, list, true);
+        void this.instanced(into, nm, heights[nm.replace(/^hex\/building_/, '').replace(/_(blue|red|green)$/, '')] ?? 6, list, true);
     };
     const vSpots: [number, number][] = m.theme === 'forest'
       ? [[m.width * 0.5, m.depth * 0.12], [m.width * 0.72, m.depth * 0.9], [m.castle.x + 70, m.depth * 0.88]]
@@ -261,20 +260,20 @@ export class World {
         : [[m.width * 0.5, m.depth * 0.1], [m.width * 0.42, m.depth * 0.9], [m.castle.x + 70, m.depth * 0.5]];
     vSpots.forEach(([x, z], i) => village(x, z, 9, 20, colors[i % colors.length]));
     // camps along the roads
-    void this.instanced('hex/tent', 4.2, place(Math.round(14 * area), (x, z) => inField(x, z, 4) && this.roadDist(x, z) > 10 && this.roadDist(x, z) < 22 && !inZone(x, z) && !nearCastle(x, z, 40), [0.9, 1.2], 0));
-    void this.instanced('hex/barrel', 1.6, place(Math.round(30 * area), (x, z) => inField(x, z, 4) && !onRoad(x, z, 6) && (this.roadDist(x, z) < 22) && !inZone(x, z) && !nearCastle(x, z, 36), [0.8, 1.3], 0));
+    void this.instanced(into, 'hex/tent', 4.2, place(Math.round(14 * area), (x, z) => inField(x, z, 4) && this.roadDist(x, z) > 10 && this.roadDist(x, z) < 22 && !inZone(x, z) && !nearCastle(x, z, 40), [0.9, 1.2], 0));
+    void this.instanced(into, 'hex/barrel', 1.6, place(Math.round(30 * area), (x, z) => inField(x, z, 4) && !onRoad(x, z, 6) && (this.roadDist(x, z) < 22) && !inZone(x, z) && !nearCastle(x, z, 36), [0.8, 1.3], 0));
 
     // ground cover (Kenney Nature Kit): flowers, bushes, tufts, rocks
     const meadow = (x: number, z: number) => inField(x, z, 2) && !onRoad(x, z, 4) && !nearCastle(x, z, 14);
     for (const f of ['flower_redA', 'flower_yellowA', 'flower_purpleA', 'flower_redB', 'flower_yellowB', 'flower_purpleC'])
-      void this.instanced(f, 1.1, place(Math.round(90 * area), meadow, [0.8, 1.4], 0));
-    void this.instanced('plant_bush', 1.5, place(Math.round(100 * area), (x, z) => meadow(x, z) || outside(x, z, 2), [0.8, 1.7], 30));
-    void this.instanced('plant_bushLarge', 2.2, place(Math.round(60 * dense * area), (x, z) => outside(x, z, 3), [0.8, 1.5]));
-    void this.instanced('grass_large', 1.2, place(Math.round(380 * area), meadow, [0.8, 1.5], 0));
-    void this.instanced('rock_largeA', 2, place(Math.round(30 * area), (x, z) => meadow(x, z) || outside(x, z, 2), [0.7, 2.0], 40));
-    void this.instanced('rock_largeC', 3, place(Math.round(22 * area), rimOk, [0.8, 2.4]));
-    void this.instanced('mushroom_redGroup', 1, place(Math.round(30 * dense * area), (x, z) => rimOk(x, z) || (inField(x, z, 2) && Math.min(z, m.depth - z) < 12), [0.8, 1.3], 20));
-    void this.instanced('log_stack', 1.8, place(Math.round(8 * area), (x, z) => inField(x, z, 3) && Math.min(z, m.depth - z) < 12 && x > 50, [0.9, 1.1], 0));
+      void this.instanced(into, f, 1.1, place(Math.round(90 * area), meadow, [0.8, 1.4], 0));
+    void this.instanced(into, 'plant_bush', 1.5, place(Math.round(100 * area), (x, z) => meadow(x, z) || outside(x, z, 2), [0.8, 1.7], 30));
+    void this.instanced(into, 'plant_bushLarge', 2.2, place(Math.round(60 * dense * area), (x, z) => outside(x, z, 3), [0.8, 1.5]));
+    void this.instanced(into, 'grass_large', 1.2, place(Math.round(380 * area), meadow, [0.8, 1.5], 0));
+    void this.instanced(into, 'rock_largeA', 2, place(Math.round(30 * area), (x, z) => meadow(x, z) || outside(x, z, 2), [0.7, 2.0], 40));
+    void this.instanced(into, 'rock_largeC', 3, place(Math.round(22 * area), rimOk, [0.8, 2.4]));
+    void this.instanced(into, 'mushroom_redGroup', 1, place(Math.round(30 * dense * area), (x, z) => rimOk(x, z) || (inField(x, z, 2) && Math.min(z, m.depth - z) < 12), [0.8, 1.3], 20));
+    void this.instanced(into, 'log_stack', 1.8, place(Math.round(8 * area), (x, z) => inField(x, z, 3) && Math.min(z, m.depth - z) < 12 && x > 50, [0.9, 1.1], 0));
   }
 
   private async buildCastle(into: THREE.Group) {
