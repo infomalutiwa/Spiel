@@ -7,6 +7,7 @@ import { Effects } from './render/effects';
 import { Controls } from './input/controls';
 import { Ui, reasonText } from './ui/ui';
 import { showGallery } from './gallery';
+import { audio } from './audio';
 
 const canvas = document.getElementById('c') as HTMLCanvasElement;
 const world = new World(canvas, MAPS[DEFAULT_MAP]);
@@ -108,3 +109,16 @@ if (gallery) void showGallery(world); else ui.showLobby({
 
 // handy for automated tests and debugging
 (window as unknown as { __bw: unknown }).__bw = { get conn() { return conn; }, get controls() { return controls; }, world, views };
+
+// sound: browsers need a gesture first; button clicks get a small tick; M or the speaker toggles mute
+addEventListener('pointerdown', e => {
+  audio.unlock();
+  if ((e.target as HTMLElement | null)?.closest('button')) audio.play('click', 0.5);
+}, { capture: true });
+const mute = document.createElement('button');
+mute.id = 'mute'; mute.title = 'Ton an/aus (M)';
+const showMute = () => { mute.textContent = audio.muted ? '🔇' : '🔊'; };
+mute.onclick = () => { audio.unlock(); audio.toggleMute(); showMute(); };
+showMute();
+document.body.appendChild(mute);
+addEventListener('keydown', e => { if (e.key.toLowerCase() === 'm' && !(e.target instanceof HTMLInputElement)) { audio.unlock(); audio.toggleMute(); showMute(); } });

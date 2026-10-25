@@ -1,3 +1,4 @@
+import { audio } from '../audio';
 import * as THREE from 'three';
 import {
   UNIT_DEFS, type AbilityId, type Command, type Formation, type Snapshot, type TroopType, type UnitSnap,
@@ -135,7 +136,7 @@ export class Controls {
     const m = this.mode;
     if (m.k === 'buy') {
       if (this.phase() !== 'prep') return this.cancel();
-      this.send({ c: 'buy', troop: m.troop, x: g.x, y: g.y });
+      this.send({ c: 'buy', troop: m.troop, x: g.x, y: g.y }); audio.play('coins', 0.7);
       return;
     }
     if (m.k === 'ability') { this.send({ c: 'ability', id: m.id, x: g.x, y: g.y }); this.cancel(); return; }

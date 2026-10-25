@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { DamageKind, GameEvent } from '@burgwacht/shared';
 import type { World } from './scene';
 import type { UnitViews } from './units';
+import { audio } from '../audio';
 
 interface Particle {
   s: THREE.Sprite; vx: number; vy: number; vz: number; g: number; life: number; max: number;
@@ -132,34 +133,49 @@ export class Effects {
     } });
   }
 
+  /** loudness falls off with distance from what the camera looks at */
+  private vol(x: number, y: number) {
+    const t = this.world.target, d = Math.hypot(x - t.x, y - t.z);
+    return Math.max(0, 1 - d / (this.world.dist * 1.1 + 25));
+  }
+
   private play(ev: GameEvent) {
     switch (ev.k) {
-      case 'shot': this.shot(ev); break;
+      case 'shot': {
+        this.shot(ev);
+        const v = this.vol(ev.tx, ev.ty);
+        const k = ev.kind;
+        audio.play(k === 'slash' ? 'slash' : k === 'spear' ? 'spear' : k === 'charge' ? 'charge' : k === 'pierce' ? 'arrow' : k === 'bolt' ? 'bolt' : k === 'magic' ? 'magic' : 'siege', v);
+        break;
+      }
       case 'dmg':
         if (ev.amt > 0) this.float(ev.x, ev.y, String(ev.amt), ev.amt >= 40 ? 'big' : '');
         break;
       case 'heal':
-        this.float(ev.x, ev.y, `+${ev.amt}`, 'heal');
+        this.float(ev.x, ev.y, `+${ev.amt}`, 'heal'); audio.play('heal', this.vol(ev.x, ev.y) * 0.6);
         this.spark(ev.x, 0.8, ev.y, '#7be09a', { n: 3, speed: 0.8, up: 2.4, g: -1, life: 0.9, s0: 0.35, s1: 0.2 });
         break;
       case 'aoe': {
         const col = { magic: '#b78cff', arrows: '#ffe3a8', rally: '#ffd75e', siege: '#d8c8a8' }[ev.kind];
         this.ring(ev.x, ev.y, ev.r, col, ev.kind === 'rally' ? 0.9 : 0.5);
+        audio.play(ev.kind === 'rally' ? 'rally' : ev.kind === 'magic' ? 'magic' : ev.kind === 'arrows' ? 'arrow' : 'siege', Math.max(0.5, this.vol(ev.x, ev.y)));
         if (ev.kind === 'arrows') this.arrowRain(ev.x, ev.y, ev.r);
         if (ev.kind === 'rally') this.spark(ev.x, 0.5, ev.y, '#ffd75e', { n: 26, speed: ev.r * 0.7, up: 5, g: 1, life: 1.1, s0: 0.5, s1: 0.2 });
         if (ev.kind === 'magic') this.spark(ev.x, 0.8, ev.y, '#c9a8ff', { n: 12, speed: ev.r, up: 2, life: 0.6, s0: 0.6, s1: 1.4 });
         break;
       }
       case 'death':
+        audio.play('death', this.vol(ev.x, ev.y));
         this.spark(ev.x, 0.8, ev.y, '#f2ead7', { n: 7, speed: 2.6, up: 2, life: 0.7, s0: 0.8, s1: 2.0, o0: 0.8 });
         this.spark(ev.x, 1.2, ev.y, '#ffd75e', { n: 3, speed: 1.5, up: 4, g: 8, life: 0.6, s0: 0.3, s1: 0.1 });
         break;
       case 'level':
+        audio.play('level', this.vol(ev.x, ev.y));
         this.ring(ev.x, ev.y, 2.4, '#ffd75e', 0.7);
         this.spark(ev.x, 1.0, ev.y, '#ffd75e', { n: 12, speed: 2.5, up: 5, g: 6, life: 0.9, s0: 0.45, s1: 0.1 });
         break;
-      case 'wave': this.onBanner(`wave:${ev.wave}`); break;
-      case 'phase': this.onBanner(`phase:${ev.phase}`); break;
+      case 'wave': audio.play('horn'); this.onBanner(`wave:${ev.wave}`); break;
+      case 'phase': if (ev.phase === 'won') audio.play('win'); else if (ev.phase === 'lost') audio.play('lose'); this.onBanner(`phase:${ev.phase}`); break;
     }
   }
 
