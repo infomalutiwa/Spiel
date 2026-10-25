@@ -26,7 +26,7 @@ export const MAPS: Record<string, MapDef> = {
     castle: { x: 130, y: 100 },
     spawns: [{ x: 8, y: 100 }, { x: 252, y: 100 }, { x: 130, y: 8 }, { x: 130, y: 192 }],
     placeZone: { x0: 60, x1: 200, y0: 55, y1: 145 },
-    decorSeed: 33, waveScale: 2.9,
+    decorSeed: 33, waveScale: 2.3,
   },
 };
 export const DEFAULT_MAP = 'meadow';

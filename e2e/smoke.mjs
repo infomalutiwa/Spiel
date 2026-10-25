@@ -10,11 +10,14 @@ const BASE = process.env.BASE ?? 'http://localhost:5173';
 const browser = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
 const errors = [];
 const open = async () => {
-  const p = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  const p = await browser.newPage({ viewport: { width: 960, height: 540 } });
+  p.setDefaultTimeout(90000); // software rendering is slow; the 3D scene hogs the main thread
   p.on('pageerror', e => errors.push(e.message));
   p.on('console', m => { if (m.type() === 'error' && !/GLTFLoader|Failed to load resource/.test(m.text())) errors.push(m.text()); });
   return p;
 };
+// clicking through the page's own event loop avoids 'element not stable' while the 3D scene is busy
+const jsClick = (p, sel) => p.evaluate(s => document.querySelector(s).click(), sel);
 const check = (cond, msg) => { if (!cond) { console.error('FAIL:', msg); process.exitCode = 1; } else console.log('ok  :', msg); };
 const snap = p => p.evaluate(() => window.__bw.conn.latest());
 const until = async (p, fn, ms = 30000) => {
@@ -23,11 +26,11 @@ const until = async (p, fn, ms = 30000) => {
 };
 
 const a = await open(), b = await open();
-await a.goto(BASE); await a.click('#create');
+await a.goto(BASE); await jsClick(a, '#create');
 await a.waitForSelector('.bigcode');
 const code = (await a.textContent('.bigcode')).trim();
 check(/^[A-Z]{4}$/.test(code), `room code ${code}`);
-await b.goto(`${BASE}/?room=${code}`); await b.click('#join');
+await b.goto(`${BASE}/?room=${code}`); await jsClick(b, '#join');
 check(await until(a, s => s && !s.paused), 'both players connected, game running');
 
 const buy = (p, list) => p.evaluate(l => l.forEach(([t, x, y]) => window.__bw.conn.cmd({ c: 'buy', troop: t, x, y })), list);
@@ -36,7 +39,7 @@ await buy(b, [['cavalry', 64, 80], ['healer', 54, 70], ['archer', 56, 62]]);
 check(await until(a, s => s.units.filter(u => u.owner !== null && u.type !== 'castle').length === 6), 'six troops bought and placed');
 
 // third client is turned away
-const c = await open(); await c.goto(`${BASE}/?room=${code}`); await c.click('#join');
+const c = await open(); await c.goto(`${BASE}/?room=${code}`); await jsClick(c, '#join');
 await c.waitForSelector('.err:not(:empty)');
 check((await c.textContent('.err')).includes('voll'), 'third player is rejected with a clear message');
 
@@ -47,7 +50,7 @@ check(await until(a, s => s.units.some(u => u.side === 'enemy')), 'enemy wave sp
 // one player drops and rejoins: game pauses, seat is restored
 await b.reload();
 await b.waitForSelector('#lobby');
-await b.click('#join');
+await jsClick(b, '#join');
 check(await until(a, s => !s.paused, 15000), 'rejoin by code resumes the game');
 
 check(await until(a, s => s.units.some(u => u.side === 'enemy' && u.hp < u.maxHp), 150000), 'fighting happens (enemies take damage)');

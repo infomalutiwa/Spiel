@@ -5,7 +5,9 @@ import { castAbility } from './abilities';
 
 /** simple scripted player used by balance tests: spends all gold on a fixed mix and holds a block in front of the castle */
 export function botBuy(s: GameState, player: PlayerId, mix: TroopType[], x?: number): number {
-  const z = MAPS[s.mapId].placeZone, cy = (z.y0 + z.y1) / 2;
+  const map = MAPS[s.mapId], z = map.placeZone, cy = (z.y0 + z.y1) / 2;
+  // castle in the middle of the build zone (valley): ring the castle so every approach is covered
+  const ring = map.castle.x > z.x0 && map.castle.x < z.x1 && map.castle.y > z.y0 && map.castle.y < z.y1;
   const x0 = x ?? z.x0 + 6;
   let bought = 0, i = 0;
   const me = s.players[player];
@@ -15,11 +17,17 @@ export function botBuy(s: GameState, player: PlayerId, mix: TroopType[], x?: num
       if (mix.every(m => TROOPS[m].cost > me.gold)) break;
       continue;
     }
-    // blocks of 8 columns; players take the north / south half of the zone
-    const col = bought % 8, row = Math.floor(bought / 8);
-    const y = cy + (player === 0 ? -1 : 1) * (6 + row * 3.4);
-    const px = x0 + col * 3.2 + (player === 0 ? 0 : 1.2);
-    if (applyCommand(s, player, { c: 'buy', troop: t, x: px, y: Math.min(z.y1, Math.max(z.y0, y)) }).ok) bought++;
+    let px: number, py: number;
+    if (ring) {
+      const n = bought * 2 + player, ang = n * 2.399963, r = 22 + (Math.floor(n / 12) % 5) * 4;
+      px = map.castle.x + Math.cos(ang) * r; py = map.castle.y + Math.sin(ang) * r;
+    } else { // blocks of 8 columns; players take the north / south half of the zone
+      const col = bought % 8, row = Math.floor(bought / 8);
+      py = cy + (player === 0 ? -1 : 1) * (6 + row * 3.4);
+      px = x0 + col * 3.2 + (player === 0 ? 0 : 1.2);
+    }
+    px = Math.min(z.x1, Math.max(z.x0, px)); py = Math.min(z.y1, Math.max(z.y0, py));
+    if (applyCommand(s, player, { c: 'buy', troop: t, x: px, y: py }).ok) bought++;
     else break;
   }
   return bought;
