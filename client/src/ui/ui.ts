@@ -169,20 +169,23 @@ export class Ui {
       this.squadSig = ''; // chips pick the portrait up on the next update
     });
 
-    const key = (k: string) => `<span class="key" style="position:static;display:inline-block;margin-left:4px">${k}</span>`;
+    const key = (k: string) => `<kbd>${k}</kbd>`;
     const orders = $('#orders', this.hud);
+    const fTip: Record<string, string> = { line: 'Feuerlinie: Fernkämpfer +15 % Schaden', wedge: 'Sturmkeil: Reiter-Angriff noch stärker', block: 'Schildwall: Nahkämpfer −15 % Schaden' };
     orders.innerHTML = `
-      <button class="ob" data-a="attack"><span class="ic">⚔️</span>Angriff${key('A')}</button>
-      <button class="ob" data-a="hold"><span class="ic">🛡️</span>Halten${key('H')}</button>
-      <button class="ob" data-a="retreat"><span class="ic">🏃</span>Rückzug${key('X')}</button>
-      <div class="sep"></div>
-      ${(['line', 'wedge', 'block'] as Formation[]).map((f, i) => `<button class="ob" data-f="${f}" title="${({ line: 'Feuerlinie: Fernkämpfer +15 % Schaden', wedge: 'Sturmkeil: Reiter-Angriff noch stärker', block: 'Schildwall: Nahkämpfer −15 % Schaden' } as Record<string, string>)[f]}"><span class="ic">${['▬', '▲', '▦'][i]}</span>${FORM[f]}${key(String(i + 1))}</button>`).join('')}
-      <div class="sep touchonly"></div>
-      <button class="ob touchonly" data-a="all"><span class="ic">👥</span>Alle</button>
-      <button class="ob touchonly" data-a="none"><span class="ic">✖️</span>Abwählen</button>
-      <div class="sep"></div>
-      <button class="ob abil" data-ab="arrowRain"><span class="ic">🏹</span>Pfeilregen${key('Q')}<div class="cd"></div><div class="cdt"></div></button>
-      <button class="ob abil" data-ab="rally"><span class="ic">📯</span>Anfeuern${key('E')}<div class="cd"></div><div class="cdt"></div></button>`;
+      <div class="dsel" id="dsel"></div>
+      <div class="dgrp dcmds">
+        <button class="cmd" data-a="attack"><i>⚔️</i><span>Angriff</span>${key('A')}</button>
+        <button class="cmd" data-a="hold"><i>🛡️</i><span>Halten</span>${key('H')}</button>
+        <button class="cmd" data-a="retreat"><i>🏃</i><span>Rückzug</span>${key('X')}</button>
+      </div>
+      <div class="dgrp dform"><span class="dl">Formation</span><div class="seg">
+        ${(['line', 'wedge', 'block'] as Formation[]).map((f, i) => `<button data-f="${f}" title="${fTip[f]}"><i>${['▬', '▲', '▦'][i]}</i><span>${FORM[f]}</span></button>`).join('')}
+      </div></div>
+      <div class="dgrp dabil">
+        <button class="abil" data-ab="arrowRain" title="Pfeilregen: Schaden in einem Bereich"><i>🏹</i><span>Pfeilregen</span>${key('Q')}<b class="cdt"></b></button>
+        <button class="abil" data-ab="rally" title="Anfeuern: heilt und beruhigt Truppen"><i>📯</i><span>Anfeuern</span>${key('E')}<b class="cdt"></b></button>
+      </div>`;
     orders.onclick = ev => {
       const b = (ev.target as HTMLElement).closest('button'); if (!b) return;
       const ids = [...controls.selected];
@@ -232,6 +235,23 @@ export class Ui {
     this.squadSig = ''; // selection changed: redraw chips
     this.updateWallPanel();
     this.updateSquads();
+    this.updateDeck();
+  }
+
+  /** the card on the left of the command bar: what is selected right now */
+  private updateDeck() {
+    if (!this.hud || !this.controls || !this.snap) return;
+    const c = this.controls, box = $('#dsel', this.hud), orders = $('#orders', this.hud);
+    const us = this.snap.units.filter(u => c.selected.has(u.id));
+    orders.classList.toggle('nosel', us.length === 0);
+    const tools = '<span class="dtools"><button data-a="all" title="Alle Trupps wählen">👥</button><button data-a="none" title="Auswahl aufheben">✖</button></span>';
+    if (!us.length) { box.innerHTML = '<span class="dtx"><span class="dh">Nichts gewählt</span><span class="dsub">' + (c.isTouch ? 'Tippe einen Trupp an' : 'Klick auf einen Trupp') + ' – oder zieh einen Rahmen</span></span>' + tools; return; }
+    const by = new Map<string, number>(); us.forEach(u => by.set(u.type, (by.get(u.type) ?? 0) + 1));
+    const squads = new Set(us.map(u => u.squad)).size, hp = us.reduce((a, u) => a + u.hp, 0) / us.reduce((a, u) => a + u.maxHp, 0);
+    const first = [...by.keys()][0] as TroopType;
+    const title = by.size === 1 ? `${UNIT_DEFS[first].name}` : `${squads} Trupps`;
+    const sub = [...by].map(([t, n]) => `${n}× ${UNIT_DEFS[t as TroopType].name}`).join(' · ');
+    box.innerHTML = `<img alt="" src="${this.portraits[first] ?? ''}" /><div class="dtx"><span class="dh">${title}</span><span class="dsub">${by.size > 1 ? sub : us.length + ' Mann'}</span><i class="hpb"><b style="width:${Math.round(hp * 100)}%"></b></i></div>${tools}`;
   }
 
   private updateWallPanel() {
@@ -279,7 +299,7 @@ export class Ui {
     const box = $('#squads', this.hud);
     if (sig !== this.squadSig) {
       this.squadSig = sig;
-      box.innerHTML = rows.map(r => `<button class="chip${r.sel ? ' sel' : ''}${r.n === 0 ? ' gone' : ''}" data-sq="${r.id}" title="${TROOPS[r.type].name}">
+      box.innerHTML = rows.map(r => `<button class="chip${r.sel ? ' on' : ''}${r.n === 0 ? ' gone' : ''}" data-sq="${r.id}" title="${TROOPS[r.type].name}">
         <img alt="" src="${this.portraits[r.type] ?? ''}" /><span class="n">${r.n}/${r.size}</span><i class="hpb"><b style="width:${Math.round(r.f * 100)}%"></b></i>
         ${prep && r.n < r.size ? `<span class="fill${r.cost <= gold ? '' : ' poor'}" title="Auffüllen">＋${r.cost}</span>` : ''}</button>`).join('');
     } else {
@@ -366,7 +386,8 @@ export class Ui {
     this.hud.querySelectorAll<HTMLElement>('.abil').forEach(b => {
       const id = b.dataset.ab as AbilityId, cd = me.abilityCd[id];
       const max = id === 'arrowRain' ? 22 : 38;
-      ($('.cd', b)).style.height = `${Math.min(100, (cd / max) * 100)}%`;
+      b.style.setProperty('--p', `${Math.min(100, (cd / max) * 100)}%`);
+      b.classList.toggle('cool', cd > 0);
       ($('.cdt', b)).textContent = cd > 0 ? String(Math.ceil(cd)) : '';
     });
 
@@ -381,6 +402,7 @@ export class Ui {
       this.refreshStatic(controls);
     }
     this.updateSquads();
+    this.updateDeck();
     if (controls.wallSel >= 0) this.updateWallPanel();
 
     if ((s.paused || !conn.peerConnected) && s.phase !== 'won' && s.phase !== 'lost' && !this.waiting && !this.overlay) {
