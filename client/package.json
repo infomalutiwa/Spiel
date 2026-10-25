@@ -1,0 +1,2 @@
+{ "name": "@burgwacht/client", "version": "0.1.0", "type": "module",
+  "scripts": { "dev": "vite --host", "build": "vite build" } }
