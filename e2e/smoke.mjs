@@ -31,8 +31,8 @@ await b.goto(`${BASE}/?room=${code}`); await b.click('#join');
 check(await until(a, s => s && !s.paused), 'both players connected, game running');
 
 const buy = (p, list) => p.evaluate(l => l.forEach(([t, x, y]) => window.__bw.conn.cmd({ c: 'buy', troop: t, x, y })), list);
-await buy(a, [['knight', 44, 38], ['archer', 40, 44], ['spearman', 44, 50]]);
-await buy(b, [['cavalry', 48, 32], ['healer', 38, 46], ['archer', 40, 40]]);
+await buy(a, [['knight', 60, 60], ['archer', 56, 66], ['spearman', 60, 72]]);
+await buy(b, [['cavalry', 64, 80], ['healer', 54, 70], ['archer', 56, 62]]);
 check(await until(a, s => s.units.filter(u => u.owner !== null && u.type !== 'castle').length === 6), 'six troops bought and placed');
 
 // third client is turned away
@@ -50,6 +50,6 @@ await b.waitForSelector('#lobby');
 await b.click('#join');
 check(await until(a, s => !s.paused, 15000), 'rejoin by code resumes the game');
 
-check(await until(a, s => s.units.some(u => u.side === 'enemy' && u.hp < u.maxHp) || s.players[0].gold > 0 && s.units.filter(u => u.side === 'enemy').length < 6, 90000), 'fighting happens');
+check(await until(a, s => s.units.some(u => u.side === 'enemy' && u.hp < u.maxHp), 150000), 'fighting happens (enemies take damage)');
 check(errors.length === 0, `no console errors${errors.length ? ': ' + errors.slice(0, 3).join(' | ') : ''}`);
 await browser.close();
