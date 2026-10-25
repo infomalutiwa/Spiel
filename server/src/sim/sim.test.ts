@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { UNIT_DEFS, WAVES, MAPS, type Command } from '@burgwacht/shared';
+import { UNIT_DEFS, WAVES, MAPS, START_GOLD, type Command } from '@burgwacht/shared';
 import { createGame, applyCommand, resolveDamage, castAbility, tick, stepMovement, separate, getUnit } from './index';
 import { battle, mine, foe, run } from './helpers';
 
@@ -147,7 +147,7 @@ describe('orders', () => {
   it('buy checks gold, zone and phase; spends gold', () => {
     const s = createGame('meadow', 1);
     expect(applyCommand(s, 0, { c: 'buy', troop: 'knight', x: 40, y: 40 })).toEqual({ ok: true });
-    expect(s.players[0].gold).toBe(320 - UNIT_DEFS.knight.cost);
+    expect(s.players[0].gold).toBe(START_GOLD - UNIT_DEFS.knight.cost);
     const g = s.players[0].gold, n = s.units.length;
     expect(applyCommand(s, 0, { c: 'buy', troop: 'catapult', x: 40, y: 40 }).ok).toBe(g >= 180);
     s.units.length = n; s.players[0].gold = 10;

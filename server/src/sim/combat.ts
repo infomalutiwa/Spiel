@@ -31,7 +31,7 @@ export function applyDamage(s: GameState, credit: Credit, victim: Unit, amt: num
   if (victim.side === 'enemy' && credit.owner !== null)
     s.players[credit.owner].gold += Math.round(UNIT_DEFS[victim.type].cost * 0.8);
   const k = credit.unit;
-  if (k && k.hp > 0) {
+  if (k && k.hp > 0 && k.type !== 'castle') {
     k.xp += 1;
     if (k.level < 3 && k.xp >= XP_FOR_LEVEL[k.level]) {
       k.level++;
@@ -101,8 +101,9 @@ export function stepCombat(s: GameState, dt: number): void {
     if (!t) t = pickTarget(s, u, reach);
     u.targetId = t?.id ?? null;
 
-    if (def.special === 'buff') { // shamans keep their distance, never attack
-      if (t && edgeDist(u, t) < 11) { u.anim = 0; continue; }
+    if (def.special === 'buff') { // shamans keep their distance, never attack – unless they are the last ones standing
+      const escort = s.units.some(o => o !== u && o.hp > 0 && o.side === u.side && UNIT_DEFS[o.type].special !== 'buff');
+      if (t && escort && edgeDist(u, t) < 11) { u.anim = 0; continue; }
       t = undefined;
     }
 

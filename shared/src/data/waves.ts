@@ -30,6 +30,6 @@ export const WAVES: WaveDef[] = [
 ];
 
 /** gold both players receive after clearing wave index w */
-export const waveReward = (w: number) => 140 + w * 25;
-export const START_GOLD = 320;
+export const waveReward = (w: number) => 160 + w * 32;
+export const START_GOLD = 360;
 export const PREP_TIME = 40;
