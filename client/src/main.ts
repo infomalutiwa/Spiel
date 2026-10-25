@@ -5,6 +5,7 @@ import { UnitViews } from './render/units';
 import { Effects } from './render/effects';
 import { Controls } from './input/controls';
 import { Ui, reasonText } from './ui/ui';
+import { showGallery } from './gallery';
 
 const canvas = document.getElementById('c') as HTMLCanvasElement;
 const world = new World(canvas, MAPS[DEFAULT_MAP]);
@@ -29,7 +30,8 @@ function loop(now: number) {
     world.setPlacementZone(s?.phase === 'prep');
     fx.update(dt);
     controls.frame(dt);
-  } else { // lobby: slow cinematic orbit over the castle
+  } else if (gallery) { world.frame(dt, { x: 0, z: 0 }, 0); }
+  else { // lobby: slow cinematic orbit over the castle
     lobbyAngle += dt * 0.08;
     world.target.set(30 + Math.sin(lobbyAngle) * 8, 0, 45);
     world.yaw = Math.sin(lobbyAngle * 0.7) * 0.35;
@@ -59,8 +61,10 @@ async function enter(c: Connection) {
   const s = c.latest(); if (s) ui.update(s, c, controls);
 }
 
-const preset = new URLSearchParams(location.search).get('room')?.toUpperCase() ?? undefined;
-ui.showLobby({
+const params = new URLSearchParams(location.search);
+const preset = params.get('room')?.toUpperCase() ?? undefined;
+const gallery = params.has('gallery');
+if (gallery) showGallery(world); else ui.showLobby({
   create: async () => enter(await Connection.open()),
   join: async code => {
     if (code.length !== 4) throw new Error('room_not_found');

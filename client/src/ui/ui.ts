@@ -96,7 +96,8 @@ export class Ui {
         <div class="topbar">
           <div class="pill castle">🏰<div class="bar"><i id="castleHp" style="width:100%"></i></div><span id="castleTxt"></span></div>
           <div class="center"><div class="pill"><span class="wave" id="waveTxt"></span></div>
-            <div class="timer" id="timer"></div><div class="sub" id="phaseSub"></div></div>
+            <div class="timer" id="timer"></div><div class="sub" id="phaseSub"></div>
+            <div class="sub preview" id="preview"></div></div>
           <div class="players" id="players"></div>
         </div>
         <div class="toast" id="toast"></div>
@@ -221,6 +222,11 @@ export class Ui {
       timer.textContent = ''; sub.textContent = `Kampf: ${waveName}`;
     } else { timer.textContent = ''; sub.textContent = ''; }
 
+    const lanes = ['oben', 'Mitte', 'unten'];
+    $('#preview', this.hud).textContent = s.phase === 'prep'
+      ? 'Als Nächstes: ' + WAVES[Math.min(s.wave, WAVES.length - 1)].groups
+        .map(g => `${g.count}× ${UNIT_DEFS[g.type].name} (${lanes[g.lane]})`).join(', ')
+      : '';
     $('#players', this.hud).innerHTML = ([0, 1] as PlayerId[]).map(p => {
       const colors = ['#4a94d9', '#ee7f9b'];
       const st = s.players[p];

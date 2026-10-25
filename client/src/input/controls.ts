@@ -92,7 +92,7 @@ export class Controls {
   }
 
   private move(e: PointerEvent) {
-    this.mouse = { x: e.clientX, y: e.clientY, in: true };
+    this.mouse = { x: e.clientX, y: e.clientY, in: e.target === this.world.canvas };
     if (this.drag && e.buttons & 1) {
       const dx = e.clientX - this.drag.x, dy = e.clientY - this.drag.y;
       if (Math.hypot(dx, dy) > 6) this.drag.moved = true;
