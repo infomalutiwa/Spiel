@@ -42,13 +42,20 @@ function loop(now: number) {
 requestAnimationFrame(loop);
 
 async function enter(c: Connection) {
-  conn = c;
   history.replaceState(null, '', `?room=${c.code}`);
   ui.hideLobby();
+  conn = c;
   controls = new Controls(world, views, c, () => c.latest());
   ui.buildHud(c, controls);
   controls.onError = m => ui.toast(m, true);
   world.target.set(52, 0, 45); world.yaw = 0; world.dist = 70;
+  wire(c, true);
+}
+
+/** attach a (new) connection to the running game */
+function wire(c: Connection, first = false) {
+  conn = c;
+  controls!.setConnection(c);
   c.onSnapshot = s => {
     fx.schedule(s.events, INTERP_MS);
     ui.update(s, c, controls!);
@@ -56,9 +63,27 @@ async function enter(c: Connection) {
   };
   c.onError = r => ui.toast(reasonText(r), true);
   c.onPeer = p => { if (!p && c.latest()?.phase !== 'won') ui.toast('Deine Mitspielerin hat die Verbindung verloren'); if (p) ui.hideWaiting(); };
-  c.onClose = () => ui.toast('Verbindung zum Server verloren – Seite neu laden', true);
-  if (!c.peerConnected) ui.showWaiting(c.code);
-  const s = c.latest(); if (s) ui.update(s, c, controls);
+  c.onClose = () => reconnect(c.code);
+  if (first && !c.peerConnected) ui.showWaiting(c.code);
+  const s = c.latest(); if (s) ui.update(s, c, controls!);
+}
+
+/** the server keeps the seat for our token, so just knock again with a growing delay */
+async function reconnect(code: string) {
+  ui.toast('Verbindung verloren – versuche, wieder einzusteigen …', true);
+  for (let attempt = 0; attempt < 40; attempt++) {
+    await new Promise(r => setTimeout(r, Math.min(5000, 600 * (attempt + 1))));
+    try {
+      const c = await Connection.open(code);
+      wire(c);
+      ui.toast('Wieder verbunden!');
+      return;
+    } catch (e) {
+      const reason = String((e as Error).message);
+      if (reason === 'room_not_found' || reason === 'room_full') break;
+    }
+  }
+  ui.toast('Keine Verbindung mehr – bitte die Seite neu laden', true);
 }
 
 const params = new URLSearchParams(location.search);

@@ -68,8 +68,9 @@ export function applyCommand(s: GameState, player: PlayerId, c: Command): Result
 
     case 'buy': {
       if (!prepOnly) return fail('not_prep');
+      if (typeof c.troop !== 'string' || !Object.hasOwn(TROOPS, c.troop)) return fail('bad_command');
       const def = TROOPS[c.troop];
-      if (!def || !finite(c.x, c.y)) return fail('bad_command');
+      if (!finite(c.x, c.y)) return fail('bad_command');
       if (def.cost > me.gold) return fail('not_enough_gold');
       if (!inZone(s, c.x, c.y)) return fail('outside_zone');
       me.gold -= def.cost;
@@ -99,7 +100,7 @@ export function applyCommand(s: GameState, player: PlayerId, c: Command): Result
       if (!us || !finite(c.x, c.y)) return fail('bad_command');
       const map = MAPS[s.mapId];
       const x = Math.min(map.width - 1, Math.max(1, c.x)), y = Math.min(map.depth - 1, Math.max(1, c.y));
-      const slots = formationSlots(us, c.formation ?? 'block', { x, y }, facingTo(us, x, y));
+      const slots = formationSlots(us, c.formation === 'line' || c.formation === 'wedge' ? c.formation : 'block', { x, y }, facingTo(us, x, y));
       const focus = c.c === 'attack' ? getUnit(s, c.targetId) : undefined;
       us.forEach((u, i) => {
         const p = { x: Math.min(map.width - 1, Math.max(1, slots[i].x)), y: Math.min(map.depth - 1, Math.max(1, slots[i].y)) };

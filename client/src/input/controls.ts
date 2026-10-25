@@ -59,6 +59,9 @@ export class Controls {
     world.scene.add(this.ringGhost);
   }
 
+  /** swap in a fresh socket after a reconnect */
+  setConnection(c: Connection) { this.conn = c; }
+
   private me = () => this.conn.you;
   private send(c: Command) { this.conn.cmd(c); }
   private ids() { return [...this.selected]; }

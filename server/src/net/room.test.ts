@@ -58,3 +58,33 @@ describe('Room', () => {
     expect(r.state.events.length).toBe(0);
   });
 });
+
+describe('Room hardening', () => {
+  it('a token holder reclaims their own seat even while the old socket looks alive', () => {
+    const r = new Room('ABCD', 1);
+    const a = fake(), b = fake();
+    const sa = r.join(a) as { token: string };
+    const sb = r.join(b) as { token: string };
+    const a2 = fake();
+    expect(r.join(a2, sa.token)).toMatchObject({ you: 0, token: sa.token });
+    expect(r.tokens[1]).toBe(sb.token); // partner's token untouched
+    expect(r.sockets[1]).toBe(b);
+  });
+  it('rejects non-troop keys like "constructor" without touching gold', () => {
+    const r = new Room('ABCD', 1);
+    r.join(fake()); r.join(fake());
+    for (const troop of ['constructor', 'toString', '__proto__', 'hasOwnProperty'])
+      r.handle(0, JSON.stringify({ t: 'cmd', cmd: { c: 'buy', troop, x: 40, y: 40 } }));
+    expect(r.state.players[0].gold).toBe(360);
+    expect(r.state.units.length).toBe(1);
+  });
+  it('finished games stop their timer and registries cap the number of rooms', async () => {
+    const { RoomRegistry, MAX_ROOMS } = await import('./room');
+    const reg = new RoomRegistry();
+    const made = Array.from({ length: MAX_ROOMS + 5 }, () => reg.create());
+    expect(made.filter(Boolean).length).toBe(MAX_ROOMS);
+    expect(made[MAX_ROOMS]).toBeNull();
+    reg.sweep(Date.now() + 3 * 60_000); // nobody ever joined
+    expect(reg.rooms.size).toBe(0);
+  });
+});

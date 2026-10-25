@@ -38,24 +38,45 @@ const rooms = new RoomRegistry();
 const wss = new WebSocketServer({ server: http, maxPayload: 16 * 1024 });
 setInterval(() => rooms.sweep(), 60_000).unref();
 
+// half-open connections (sleeping laptop, dropped wifi) never emit 'close': ping everyone and cut those that stay silent
+const alive = new WeakSet<WebSocket>();
+setInterval(() => {
+  for (const ws of wss.clients) {
+    if (!alive.has(ws)) { ws.terminate(); continue; }
+    alive.delete(ws);
+    try { ws.ping(); } catch { /* closing */ }
+  }
+}, 8_000).unref();
+
 wss.on('connection', (ws: WebSocket) => {
   let seat: { room: Room; you: PlayerId } | null = null;
-  const err = (reason: string) => ws.send(JSON.stringify({ t: 'error', reason }));
+  alive.add(ws);
+  ws.on('pong', () => alive.add(ws));
+  const err = (reason: string) => { try { ws.send(JSON.stringify({ t: 'error', reason })); } catch { /* closed */ } };
 
   ws.on('message', data => {
-    const raw = data.toString();
-    if (seat) return seat.room.handle(seat.you, raw);
-    let msg: ClientMsg;
-    try { msg = JSON.parse(raw); } catch { return err('bad_message'); }
-    let room: Room | undefined;
-    if (msg.t === 'create') room = rooms.create();
-    else if (msg.t === 'join') {
-      room = rooms.get(msg.code);
-      if (!room) return err('room_not_found');
-    } else return err('bad_message');
-    const res = room.join(ws, msg.t === 'join' ? msg.token : undefined);
-    if ('error' in res) return err(res.error);
-    seat = { room, you: res.you };
+    try {
+      alive.add(ws);
+      const raw = data.toString();
+      if (seat) return seat.room.handle(seat.you, raw);
+      let msg: ClientMsg;
+      try { msg = JSON.parse(raw); } catch { return err('bad_message'); }
+      if (!msg || typeof msg !== 'object') return err('bad_message');
+      let room: Room | undefined | null;
+      if (msg.t === 'create') {
+        room = rooms.create();
+        if (!room) return err('server_full');
+      } else if (msg.t === 'join') {
+        room = typeof msg.code === 'string' ? rooms.get(msg.code) : undefined;
+        if (!room) return err('room_not_found');
+      } else return err('bad_message');
+      const res = room.join(ws, msg.t === 'join' && typeof msg.token === 'string' ? msg.token : undefined);
+      if ('error' in res) return err(res.error);
+      seat = { room, you: res.you };
+    } catch (e) { // one bad message must never take every room down
+      console.error('message handler failed', e);
+      err('bad_message');
+    }
   });
   ws.on('close', () => seat?.room.leave(ws));
   ws.on('error', () => seat?.room.leave(ws));

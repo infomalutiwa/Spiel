@@ -87,11 +87,24 @@ export class UnitViews {
     for (const [id, v] of this.views) {
       if (!seen.has(id)) {
         v.dyingT += dt;
-        if (v.dyingT > 0.2) { this.group.remove(v.rig.root); this.views.delete(id); continue; }
+        if (v.dyingT > 0.2) { this.dispose(v); this.views.delete(id); continue; }
         v.rig.root.scale.multiplyScalar(0.8);
       }
       this.animate(v, dt, selected.has(id));
     }
+  }
+
+  /** free everything that belongs to one view (shared bar/ring/star resources stay) */
+  private dispose(v: View) {
+    this.group.remove(v.rig.root);
+    const shared = new Set<unknown>([barBg, barGeo, starGeo, starMat, ringGeo]);
+    v.rig.root.traverse(o => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh) return;
+      if (!shared.has(m.geometry)) m.geometry.dispose();
+      const mat = m.material as THREE.Material;
+      if (!shared.has(mat)) mat.dispose();
+    });
   }
 
   private animate(v: View, dt: number, selected: boolean) {

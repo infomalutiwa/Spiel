@@ -31,7 +31,12 @@ export class Room {
     let seat: PlayerId | undefined;
     if (tok) {
       const i = this.tokens.indexOf(tok);
-      if (i >= 0 && !this.sockets[i]) seat = i as PlayerId;
+      if (i >= 0) { // the token holder always gets their own seat back, even if the old socket looks alive (half-open connection)
+        seat = i as PlayerId;
+        const old = this.sockets[i];
+        this.sockets[i] = null;
+        if (old && old !== ws) try { old.close(); } catch { /* already gone */ }
+      }
     }
     if (seat === undefined) seat = this.sockets[0] ? (this.sockets[1] ? undefined : 1) : 0;
     if (seat === undefined) return { error: 'room_full' };
@@ -64,12 +69,15 @@ export class Room {
     if (!res.ok) this.send(this.sockets[player], { t: 'error', reason: res.reason });
   }
 
+  get finished() { return this.state.phase === 'won' || this.state.phase === 'lost'; }
+
   start() {
     let n = 0;
     this.timer = setInterval(() => {
       if (!this.paused) {
         tick(this.state);
-        if (++n % SNAP_EVERY === 0) this.sendSnapshot();
+        if (++n % SNAP_EVERY === 0 || this.finished) this.sendSnapshot();
+        if (this.finished) this.stop(); // final state delivered; nothing left to simulate
       } else if (++n % 10 === 0) this.sendSnapshot();
     }, TICK_MS);
   }
@@ -102,21 +110,35 @@ export class Room {
 
 const token = () => Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
 
+export const MAX_ROOMS = 200;
+
 export class RoomRegistry {
   rooms = new Map<string, Room>();
+  readonly createdAt = new WeakMap<Room, number>();
 
-  create(): Room {
+  /** null when the server is full */
+  create(): Room | null {
+    this.sweep();
+    if (this.rooms.size >= MAX_ROOMS) return null;
     let code: string;
     do { code = Array.from({ length: 4 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join(''); }
     while (this.rooms.has(code));
     const room = new Room(code);
     room.start();
     this.rooms.set(code, room);
+    this.createdAt.set(room, Date.now());
     return room;
   }
   get(code: string) { return this.rooms.get(String(code).toUpperCase()); }
-  sweep(maxIdleMs = 30 * 60_000) {
-    for (const [code, r] of this.rooms)
-      if (!r.sockets[0] && !r.sockets[1] && Date.now() - r.lastActive > maxIdleMs) { r.stop(); this.rooms.delete(code); }
+  /** drops rooms nobody is in: abandoned games after 30 min, never-joined rooms after 2 min, finished games after 5 min */
+  sweep(now = Date.now()) {
+    for (const [code, r] of this.rooms) {
+      const empty = !r.sockets[0] && !r.sockets[1];
+      const idle = now - r.lastActive;
+      const neverJoined = !r.wasFull && now - (this.createdAt.get(r) ?? now) > 120_000 && empty;
+      if ((empty && idle > 30 * 60_000) || neverJoined || (r.finished && empty && idle > 5 * 60_000)) {
+        r.stop(); this.rooms.delete(code);
+      }
+    }
   }
 }

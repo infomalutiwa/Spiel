@@ -21,6 +21,22 @@ const glow = (() => {
   return new THREE.CanvasTexture(cv);
 })();
 
+/** projectile parts are shared, so firing thousands of arrows never allocates GPU resources */
+const SHARED = {
+  shaft: new THREE.CylinderGeometry(0.03, 0.03, 0.8, 5),
+  boltShaft: new THREE.CylinderGeometry(0.03, 0.03, 0.9, 5),
+  rainShaft: new THREE.CylinderGeometry(0.04, 0.04, 1.2, 5),
+  tip: new THREE.ConeGeometry(0.07, 0.2, 6),
+  rainTip: new THREE.ConeGeometry(0.09, 0.25, 6),
+  stone: new THREE.SphereGeometry(0.5, 10, 8),
+  arrowMat: new THREE.MeshBasicMaterial({ color: '#f3e6c4' }),
+  boltMat: new THREE.MeshBasicMaterial({ color: '#ffe9a8' }),
+  tipMat: new THREE.MeshBasicMaterial({ color: '#d7dde3' }),
+  stoneMat: new THREE.MeshStandardMaterial({ color: '#8b8580', roughness: 1 }),
+  orbMat: new THREE.SpriteMaterial({ map: glow, color: '#b78cff', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }),
+};
+const MAX_PROJECTILES = 160, MAX_QUEUE = 500, MAX_EVENT_AGE_MS = 600;
+
 export class Effects {
   private particles: Particle[] = [];
   private projs: Proj[] = [];
@@ -38,8 +54,9 @@ export class Effects {
 
   /** events arrive with a snapshot; play them slightly late to line up with interpolated motion */
   schedule(events: GameEvent[], delayMs: number) {
+    if (document.hidden) return; // rAF is paused in background tabs; don't pile up a burst for when we come back
     const at = performance.now() + delayMs;
-    for (const ev of events) this.queue.push({ at, ev });
+    for (const ev of events) if (this.queue.length < MAX_QUEUE) this.queue.push({ at, ev });
   }
 
   private spark(x: number, y: number, z: number, color: THREE.ColorRepresentation, o: Partial<{ n: number; speed: number; up: number; g: number; life: number; s0: number; s1: number; o0: number }> = {}) {
@@ -87,20 +104,21 @@ export class Effects {
       return;
     }
     this.views.lunge(ev.from, to.x, to.z);
+    if (this.projs.length >= MAX_PROJECTILES) return;
     let m: THREE.Object3D, speed = 28, arc = d * 0.12, spin = false, trail: THREE.ColorRepresentation | undefined;
     if (kind === 'pierce' || kind === 'bolt') {
       const g = new THREE.Group();
-      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, kind === 'bolt' ? 0.9 : 0.8, 5), new THREE.MeshBasicMaterial({ color: kind === 'bolt' ? '#ffe9a8' : '#f3e6c4' }));
+      const shaft = new THREE.Mesh(kind === 'bolt' ? SHARED.boltShaft : SHARED.shaft, kind === 'bolt' ? SHARED.boltMat : SHARED.arrowMat);
       shaft.rotation.x = Math.PI / 2;
-      const tip = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.2, 6), new THREE.MeshBasicMaterial({ color: '#d7dde3' }));
+      const tip = new THREE.Mesh(SHARED.tip, SHARED.tipMat);
       tip.rotation.x = Math.PI / 2; tip.position.z = 0.5;
       g.add(shaft, tip); m = g;
       if (kind === 'bolt') { speed = 48; arc = d * 0.02; }
     } else if (kind === 'magic') {
-      m = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow, color: '#b78cff', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+      m = new THREE.Sprite(SHARED.orbMat);
       m.scale.setScalar(1.6); speed = 20; arc = 0.5; trail = '#c9a8ff';
     } else {
-      m = new THREE.Mesh(new THREE.SphereGeometry(0.5, 10, 8), new THREE.MeshStandardMaterial({ color: '#8b8580', roughness: 1 }));
+      m = new THREE.Mesh(SHARED.stone, SHARED.stoneMat);
       speed = 14; arc = Math.max(5, d * 0.35); spin = true;
     }
     const dur = Math.max(0.12, d / speed);
@@ -146,13 +164,13 @@ export class Effects {
   }
 
   private arrowRain(cx: number, cz: number, r: number) {
-    for (let i = 0; i < 26; i++) {
+    for (let i = 0; i < 26 && this.projs.length < MAX_PROJECTILES; i++) {
       const a = Math.random() * 6.28, rr = Math.sqrt(Math.random()) * r;
       const to = new THREE.Vector3(cx + Math.cos(a) * rr, 0.2, cz + Math.sin(a) * rr);
       const from = new THREE.Vector3(to.x - 6, 26 + Math.random() * 6, to.z);
       const g = new THREE.Group();
-      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.2, 5), new THREE.MeshBasicMaterial({ color: '#f3e6c4' }));
-      const tip = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.25, 6), new THREE.MeshBasicMaterial({ color: '#d7dde3' }));
+      const shaft = new THREE.Mesh(SHARED.rainShaft, SHARED.arrowMat);
+      const tip = new THREE.Mesh(SHARED.rainTip, SHARED.tipMat);
       tip.position.y = -0.7; tip.rotation.x = Math.PI;
       g.add(shaft, tip);
       g.visible = false;
@@ -165,7 +183,11 @@ export class Effects {
   update(dt: number) {
     const now = performance.now();
     for (let i = 0; i < this.queue.length; ) {
-      if (this.queue[i].at <= now) { const { ev } = this.queue.splice(i, 1)[0]; if (!(ev.k === 'dmg' && ev.x < -1e8)) this.play(ev); }
+      if (this.queue[i].at <= now) {
+        const { at, ev } = this.queue.splice(i, 1)[0];
+        if (now - at > MAX_EVENT_AGE_MS) continue; // stale after a stall: skip instead of replaying a burst
+        if (!(ev.k === 'dmg' && ev.x < -1e8)) this.play(ev);
+      }
       else i++;
     }
     for (let i = this.projs.length - 1; i >= 0; i--) {
