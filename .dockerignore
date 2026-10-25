@@ -1,7 +1,6 @@
 node_modules
 **/node_modules
-client
-!client/package.json
+client/dist
 docs
 e2e
 tools
