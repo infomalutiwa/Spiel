@@ -1,0 +1,19 @@
+{
+  "name": "Burgwacht",
+  "short_name": "Burgwacht",
+  "description": "Kooperative 3D-Burgverteidigung für zwei",
+  "lang": "de",
+  "start_url": "/",
+  "scope": "/",
+  "id": "/",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "landscape",
+  "background_color": "#f5d9b4",
+  "theme_color": "#f5d9b4",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

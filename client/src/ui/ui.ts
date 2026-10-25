@@ -5,7 +5,7 @@ import type { Controls } from '../input/controls';
 import type { Connection } from '../net/connection';
 import { renderPortraits } from '../render/portraits';
 import { MAPS } from '@burgwacht/shared';
-
+import { mountInstall } from '../pwa';
 const REASONS: Record<string, string> = {
   not_enough_gold: 'Nicht genug Gold', outside_zone: 'Hier darfst du nicht aufstellen – nimm die helle Fläche',
   not_prep: 'Nur in der Aufstellphase', not_battle: 'Nur im Kampf', cooldown: 'Fähigkeit lädt noch',
@@ -64,13 +64,14 @@ export class Ui {
         <div class="maps" id="maps">${Object.values(MAPS).map((m, i) => `<button class="mapcard${i === 0 ? ' on' : ''}" data-map="${m.id}"><div class="sw" style="background:${SWATCH[m.id]}"></div><b>${m.name}</b><span>${m.blurb}</span></button>`).join('')}</div>
         <div class="row"><button class="btn green" id="create">Neues Spiel starten</button></div>
         <p class="hint" style="margin:18px 0 8px">oder einem Raum beitreten</p>
-        <div class="row"><input class="codeinput" id="code" maxlength="4" placeholder="ABCD" autocomplete="off" />
+        <div class="row"><input class="codeinput" id="code" maxlength="4" placeholder="ABCD" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" inputmode="text" enterkeyhint="go" />
           <button class="btn" id="join">Beitreten</button></div>
         <div class="err" id="err"></div>
       </div></div>`);
     this.root.appendChild(this.lobby);
     const err = $('#err', this.lobby), code = $<HTMLInputElement>('#code', this.lobby);
-    if (presetCode) code.value = presetCode;
+    if (presetCode) code.value = presetCode.replace(/[^A-Z]/gi, '').slice(0, 4).toUpperCase();
+    code.oninput = () => { code.value = code.value.replace(/[^a-z]/gi, '').toUpperCase().slice(0, 4); };
     const wrap = (p: Promise<void>, btn: HTMLButtonElement) => {
       btn.disabled = true; err.textContent = '';
       p.catch(e => { err.textContent = reasonText(String(e.message ?? e)); btn.disabled = false; });
@@ -84,6 +85,7 @@ export class Ui {
     };
     $<HTMLButtonElement>('#create', this.lobby).onclick = ev => wrap(h.create(mapId), ev.currentTarget as HTMLButtonElement);
     $<HTMLButtonElement>('#join', this.lobby).onclick = ev => wrap(h.join(code.value.trim()), ev.currentTarget as HTMLButtonElement);
+    mountInstall($('.lobbycard', this.lobby));
     code.onkeydown = ev => { if (ev.key === 'Enter') $<HTMLButtonElement>('#join', this.lobby!).click(); };
   }
   hideLobby() { this.lobby?.remove(); this.lobby = undefined; }
@@ -167,6 +169,10 @@ export class Ui {
       <div class="sep"></div>
       ${(['line', 'wedge', 'block'] as Formation[]).map((f, i) => `<button class="ob" data-f="${f}" title="${({ line: 'Feuerlinie: Fernkämpfer +15 % Schaden', wedge: 'Sturmkeil: Reiter-Angriff noch stärker', block: 'Schildwall: Nahkämpfer −15 % Schaden' } as Record<string, string>)[f]}"><span class="ic">${['▬', '▲', '▦'][i]}</span>${FORM[f]}<span class="key" style="position:static;display:inline-block;margin-left:4px">${i + 1}</span></button>`).join('')}
       <div class="sep"></div>
+      <div class="sep touchonly"></div>
+      <button class="ob touchonly" data-a="all"><span class="ic">👥</span>Alle</button>
+      <button class="ob touchonly" data-a="none"><span class="ic">✖️</span>Abwählen</button>
+      <div class="sep"></div>
       <button class="ob abil" data-ab="arrowRain"><span class="ic">🏹</span>Pfeilregen<span class="key" style="position:static;display:inline-block;margin-left:4px">Q</span><div class="cd"></div><div class="cdt"></div></button>
       <button class="ob abil" data-ab="rally"><span class="ic">📯</span>Anfeuern<span class="key" style="position:static;display:inline-block;margin-left:4px">E</span><div class="cd"></div><div class="cdt"></div></button>`;
     orders.onclick = ev => {
@@ -175,6 +181,8 @@ export class Ui {
       if (b.dataset.a === 'attack' && ids.length) controls.setMode({ k: 'attackMove' });
       else if (b.dataset.a === 'hold' && ids.length) conn.cmd({ c: 'hold', ids });
       else if (b.dataset.a === 'retreat' && ids.length) conn.cmd({ c: 'retreat', ids });
+      else if (b.dataset.a === 'all') controls.selectAll();
+      else if (b.dataset.a === 'none') controls.clearSelection();
       else if (b.dataset.f) { controls.formation = b.dataset.f as Formation; controls.onChange(); }
       else if (b.dataset.ab) controls.setMode({ k: 'ability', id: b.dataset.ab as AbilityId });
     };
@@ -196,9 +204,10 @@ export class Ui {
     this.hud.querySelectorAll<HTMLElement>('[data-ab]').forEach(b => b.classList.toggle('active', c.mode.k === 'ability' && c.mode.id === b.dataset.ab));
     this.hud.querySelector('[data-a="attack"]')?.classList.toggle('active', c.mode.k === 'attackMove');
     const hint = $('#hint', this.hud);
-    const text = c.mode.k === 'buy' ? `${TROOPS[c.mode.troop].name} platzieren: klicke auf die helle Fläche (Esc = fertig)`
-      : c.mode.k === 'attackMove' ? 'Klicke auf das Ziel für den Angriffsmarsch'
-        : c.mode.k === 'ability' ? 'Klicke auf die Stelle für die Fähigkeit' : '';
+    const tap = c.isTouch ? 'Tippe' : 'Klicke';
+    const text = c.mode.k === 'buy' ? `${TROOPS[c.mode.troop].name} platzieren: ${tap.toLowerCase()} auf die helle Fläche (${c.isTouch ? 'Karte nochmal antippen = fertig' : 'Esc = fertig'})`
+      : c.mode.k === 'attackMove' ? `${tap} auf das Ziel für den Angriffsmarsch`
+        : c.mode.k === 'ability' ? `${tap} auf die Stelle für die Fähigkeit` : '';
     hint.style.display = text ? 'block' : 'none'; hint.textContent = text;
     // selection panel
     const sel = $('#sel', this.hud);
@@ -210,7 +219,7 @@ export class Ui {
       const counts = new Map<string, number>();
       us.forEach(u => counts.set(u.type, (counts.get(u.type) ?? 0) + 1));
       sel.innerHTML = `<b>${s} ausgewählt</b><div>${[...counts].map(([t, n]) => `${n}× ${UNIT_DEFS[t as keyof typeof UNIT_DEFS].name}`).join(', ')}</div>
-        <div class="sub">Rechtsklick: ${snap?.phase === 'prep' ? 'platzieren' : 'bewegen / angreifen'}</div>`;
+        <div class="sub">${c.isTouch ? 'Tippen' : 'Rechtsklick'}: ${snap?.phase === 'prep' ? 'platzieren' : 'bewegen / angreifen'}</div>`;
     }
   }
 
@@ -262,7 +271,7 @@ export class Ui {
     const side = $('#side', this.hud);
     side.style.display = prep ? 'flex' : 'none';
     const ready = $<HTMLButtonElement>('#ready', this.hud);
-    ready.textContent = me.ready ? 'Warte auf Partnerin…' : 'Bereit! (Leertaste)';
+    ready.textContent = me.ready ? 'Warte auf Partnerin…' : controls.isTouch ? 'Bereit!' : 'Bereit! (Leertaste)';
     ready.classList.toggle('green', !me.ready); ready.classList.toggle('ghost', me.ready);
     for (const [t, c] of this.cardEls) c.classList.toggle('poor', TROOPS[t].cost > me.gold);
 
@@ -286,7 +295,7 @@ export class Ui {
     if (controls.selected.size) this.refreshStatic(controls);
 
     if ((s.paused || !conn.peerConnected) && s.phase !== 'won' && s.phase !== 'lost' && !this.waiting && !this.overlay) {
-      this.overlay = el(`<div class="overlay"><div class="panel"><h2>Pause</h2><p class="hint">Deine Mitspielerin ist nicht verbunden<span class="dots"></span></p>
+      this.overlay = el(`<div class="overlay"><div class="panel"><h2>Pause</h2><p class="hint">Es geht weiter, sobald ihr beide wieder im Spiel seid<span class="dots"></span></p>
         <div class="bigcode" style="font-size:44px">${conn.code}</div></div></div>`);
       this.root.appendChild(this.overlay);
     } else if (!s.paused && conn.peerConnected && this.overlay && this.lastPhase !== 'won' && this.lastPhase !== 'lost') {

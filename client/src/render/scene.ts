@@ -56,8 +56,10 @@ export class World {
   constructor(public canvas: HTMLCanvasElement, map: MapDef) {
     this.map = map;
     this.look = LOOKS[map.theme];
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-    this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    // phones: fewer pixels, no MSAA on dense screens, smaller shadow map – keeps hundreds of units smooth
+    const phone = matchMedia('(pointer: coarse)').matches;
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: !(phone && devicePixelRatio >= 2), powerPreference: 'high-performance' });
+    this.renderer.setPixelRatio(Math.min(devicePixelRatio, phone ? 1.5 : 2));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -70,7 +72,7 @@ export class World {
     this.scene.add(new THREE.HemisphereLight(PAL.hemiSky, PAL.hemiGround, 1.05));
     this.sun = new THREE.DirectionalLight(this.look.sun, this.look.sunI);
     this.sun.castShadow = true;
-    this.sun.shadow.mapSize.set(4096, 4096);
+    this.sun.shadow.mapSize.set(matchMedia('(pointer: coarse)').matches ? 2048 : 4096, matchMedia('(pointer: coarse)').matches ? 2048 : 4096);
     const sc = this.sun.shadow.camera;
     sc.left = -110; sc.right = 110; sc.top = 80; sc.bottom = -80; sc.near = 10; sc.far = 340; // follows the camera, see frame()
     this.sun.shadow.bias = -0.0004; this.sun.shadow.normalBias = 0.05;

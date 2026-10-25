@@ -147,7 +147,9 @@ export type Result = { ok: true } | { ok: false; reason: string };
 export type ClientMsg =
   | { t: 'create'; mapId?: string }
   | { t: 'join'; code: string; token?: string }
-  | { t: 'cmd'; cmd: Command };
+  | { t: 'cmd'; cmd: Command }
+  /** the tab went to / came back from the background; the game waits while either player is away */
+  | { t: 'vis'; hidden: boolean };
 
 export interface UnitSnap {
   id: number; type: UnitType; side: Side; owner: PlayerId | null;

@@ -24,7 +24,9 @@ export class Room {
   }
 
   get connected(): boolean { return !!(this.sockets[0] && this.sockets[1]); }
-  get paused(): boolean { return !this.connected; }
+  private away: [boolean, boolean] = [false, false];
+  /** the game only runs while both players are connected AND looking at it */
+  get paused(): boolean { return !this.connected || this.away[0] || this.away[1]; }
 
   /** seat a socket; returns the seat or an error reason */
   join(ws: Socket, tok?: string): { you: PlayerId; token: string } | { error: string } {
@@ -42,6 +44,7 @@ export class Room {
     if (seat === undefined) return { error: 'room_full' };
     if (!tok || this.tokens[seat] !== tok) this.tokens[seat] = token();
     this.sockets[seat] = ws;
+    this.away[seat] = false;
     this.lastActive = Date.now();
     this.send(ws, { t: 'joined', code: this.code, you: seat, token: this.tokens[seat], mapId: this.state.mapId });
     this.broadcast({ t: 'peer', connected: this.connected });
@@ -54,6 +57,7 @@ export class Room {
     const i = this.sockets.indexOf(ws);
     if (i < 0) return;
     this.sockets[i] = null;
+    this.away[i] = false;
     this.lastActive = Date.now();
     this.broadcast({ t: 'peer', connected: false });
   }
@@ -62,6 +66,10 @@ export class Room {
     if (raw.length > 8192) return;
     let msg: ClientMsg;
     try { msg = JSON.parse(raw); } catch { return; }
+    if (msg && msg.t === 'vis') {
+      if (this.away[player] !== !!msg.hidden) { this.away[player] = !!msg.hidden; this.sendSnapshot(); }
+      return;
+    }
     if (!msg || msg.t !== 'cmd') return;
     this.lastActive = Date.now();
     if (this.paused) return;

@@ -49,6 +49,27 @@ describe('Room', () => {
     expect(r.join(fake(), sa.token)).toMatchObject({ you: 0, token: sa.token });
     expect(r.paused).toBe(false);
   });
+  it('does not run while only one player is in the room', () => {
+    const r = new Room('ABCD', 1);
+    r.join(fake());
+    expect(r.paused).toBe(true);
+    r.handle(0, JSON.stringify({ t: 'cmd', cmd: { c: 'ready', ready: true } }));
+    expect(r.state.players[0].ready).toBe(false);
+    r.join(fake());
+    expect(r.paused).toBe(false);
+  });
+  it('pauses while either player has the app in the background', () => {
+    const r = new Room('ABCD', 1);
+    const a = fake(), b = fake();
+    r.join(a); r.join(b);
+    r.handle(1, JSON.stringify({ t: 'vis', hidden: true }));
+    expect(r.paused).toBe(true);
+    expect(a.got.at(-1)).toMatchObject({ t: 'snap' });
+    r.handle(0, JSON.stringify({ t: 'cmd', cmd: { c: 'buy', troop: 'knight', x: 60, y: 60 } }));
+    expect(r.state.units.some(u => u.type === 'knight')).toBe(false);
+    r.handle(1, JSON.stringify({ t: 'vis', hidden: false }));
+    expect(r.paused).toBe(false);
+  });
   it('snapshots contain no server-only fields and drain events', () => {
     const r = new Room('ABCD', 1);
     r.join(fake()); r.join(fake());

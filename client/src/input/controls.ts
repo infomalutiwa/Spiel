@@ -42,12 +42,17 @@ export class Controls {
   private ringGhost: THREE.Mesh;
   private lastClick = { t: 0, id: -1 };
   private box = document.getElementById('selbox')!;
+  /** touch gestures: tap = click, drag = pan, pinch = zoom, long-press + drag = box select */
+  private touches = new Map<number, { x: number; y: number }>();
+  private tg?: { sx: number; sy: number; moved: boolean; boxing: boolean; timer: number; pinch: number; t: number };
+  readonly isTouch = matchMedia('(pointer: coarse)').matches;
 
   constructor(private world: World, private views: UnitViews, private conn: Connection, private snapshot: () => Snapshot | undefined) {
     const cv = world.canvas;
     cv.addEventListener('pointerdown', e => this.down(e));
     addEventListener('pointermove', e => this.move(e));
     addEventListener('pointerup', e => this.up(e));
+    addEventListener('pointercancel', e => this.up(e));
     cv.addEventListener('contextmenu', e => { e.preventDefault(); this.rightClick(e); });
     cv.addEventListener('wheel', e => { e.preventDefault(); this.zoomImpulse += Math.sign(e.deltaY) * 0.06; }, { passive: false });
     cv.addEventListener('pointerleave', () => { this.mouse.in = false; });
@@ -91,11 +96,13 @@ export class Controls {
   }
 
   private down(e: PointerEvent) {
+    if (e.pointerType === 'touch') return this.touchDown(e);
     if (e.button !== 0 && e.button !== 1) return;
     this.drag = { x: e.clientX, y: e.clientY, moved: false };
   }
 
   private move(e: PointerEvent) {
+    if (e.pointerType === 'touch') return this.touchMove(e);
     this.mouse = { x: e.clientX, y: e.clientY, in: e.target === this.world.canvas };
     if (this.drag && e.buttons & 1) {
       const dx = e.clientX - this.drag.x, dy = e.clientY - this.drag.y;
@@ -114,6 +121,7 @@ export class Controls {
   }
 
   private up(e: PointerEvent) {
+    if (e.pointerType === 'touch') return this.touchUp(e);
     const d = this.drag; this.drag = undefined;
     this.box.style.display = 'none';
     if (!d || e.button !== 0 || (e.target as HTMLElement)?.id !== 'c') return;
@@ -132,7 +140,7 @@ export class Controls {
     this.click(g, e);
   }
 
-  private click(g: { x: number; y: number }, e: PointerEvent) {
+  private click(g: { x: number; y: number }, e: { shiftKey: boolean }) {
     const m = this.mode;
     if (m.k === 'buy') {
       if (this.phase() !== 'prep') return this.cancel();
@@ -161,6 +169,11 @@ export class Controls {
     const g = this.groundAt(e);
     if (!g) return;
     if (this.mode.k !== 'select') return this.cancel();
+    this.command(g);
+  }
+
+  /** order the selection to place / move / attack at a ground point */
+  private command(g: { x: number; y: number }) {
     if (!this.selected.size) return;
     const phase = this.phase();
     if (phase === 'prep') {
@@ -172,6 +185,95 @@ export class Controls {
       else this.send({ c: 'move', ids: this.ids(), x: g.x, y: g.y, formation: this.formation });
     }
   }
+
+
+  /* ---------- touch ---------- */
+  private touchDown(e: PointerEvent) {
+    this.touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    this.mouse = { x: e.clientX, y: e.clientY, in: this.mode.k !== 'select' };
+    if (this.touches.size === 1) {
+      const tg = { sx: e.clientX, sy: e.clientY, moved: false, boxing: false, timer: 0, pinch: 0, t: performance.now() };
+      // long press arms box selection (only when nothing else wants the next touch)
+      tg.timer = window.setTimeout(() => {
+        if (!tg.moved && this.mode.k === 'select' && this.tg === tg) { tg.boxing = true; navigator.vibrate?.(15); }
+      }, 380);
+      this.tg = tg;
+    } else if (this.tg) {
+      clearTimeout(this.tg.timer);
+      this.tg.moved = true; this.tg.boxing = false; this.box.style.display = 'none';
+      this.tg.pinch = this.pinchDist();
+    }
+  }
+
+  private pinchDist() {
+    const [a, b] = [...this.touches.values()];
+    return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0;
+  }
+
+  private touchMove(e: PointerEvent) {
+    const prev = this.touches.get(e.pointerId), tg = this.tg;
+    if (!prev || !tg) return;
+    const cur = { x: e.clientX, y: e.clientY };
+    const mid = (m: Map<number, { x: number; y: number }>) => {
+      const v = [...m.values()]; return { x: v.reduce((a, p) => a + p.x, 0) / v.length, y: v.reduce((a, p) => a + p.y, 0) / v.length };
+    };
+    const before = mid(this.touches);
+    this.touches.set(e.pointerId, cur);
+    const after = mid(this.touches);
+    if (this.touches.size >= 2) {
+      const d = this.pinchDist();
+      if (tg.pinch > 0 && d > 0) this.zoomImpulse += tg.pinch / d - 1;
+      tg.pinch = d;
+      this.panBy(before, after);
+      return;
+    }
+    if (!tg.moved && Math.hypot(cur.x - tg.sx, cur.y - tg.sy) > 10) {
+      tg.moved = true; clearTimeout(tg.timer);
+    }
+    this.mouse = { x: cur.x, y: cur.y, in: this.mode.k !== 'select' && !tg.moved };
+    if (tg.boxing) {
+      Object.assign(this.box.style, {
+        display: 'block', left: `${Math.min(cur.x, tg.sx)}px`, top: `${Math.min(cur.y, tg.sy)}px`,
+        width: `${Math.abs(cur.x - tg.sx)}px`, height: `${Math.abs(cur.y - tg.sy)}px`,
+      });
+    } else if (tg.moved) this.panBy(before, after);
+  }
+
+  /** drag the world so the ground point under the finger stays under the finger */
+  private panBy(from: { x: number; y: number }, to: { x: number; y: number }) {
+    const a = this.world.screenToGround(from.x, from.y), b = this.world.screenToGround(to.x, to.y);
+    if (a && b) this.world.focus(this.world.target.x + a.x - b.x, this.world.target.z + a.y - b.y);
+  }
+
+  private touchUp(e: PointerEvent) {
+    const had = this.touches.delete(e.pointerId);
+    const tg = this.tg;
+    if (!had || !tg) return;
+    if (this.touches.size > 0) return; // still a multi-touch gesture; wait for the last finger
+    clearTimeout(tg.timer); this.tg = undefined; this.box.style.display = 'none'; this.mouse.in = false;
+    const s = this.snapshot();
+    if (!s || e.type === 'pointercancel') return;
+    if (tg.boxing) {
+      const ids = idsInBox(s.units, u => { const p = this.views.posOf(u.id) ?? u; return this.world.worldToScreen(p.x, p.y, 1); },
+        this.me(), tg.sx, tg.sy, e.clientX, e.clientY);
+      this.selected = new Set(ids); this.onChange();
+      return;
+    }
+    if (tg.moved) return;
+    const g = this.groundAt(e);
+    if (!g) return;
+    if (this.mode.k !== 'select') return this.click(g, { shiftKey: false });
+    // select mode: tap own unit = select, tap anything else = order (or deselect when nothing is selected)
+    if (this.pick(g, true)) return this.click(g, { shiftKey: false });
+    if (this.selected.size && (this.phase() === 'prep' || this.phase() === 'battle')) { this.command(g); return; }
+    this.click(g, { shiftKey: false });
+  }
+
+  selectAll() {
+    this.selected = new Set(this.snapshot()?.units.filter(u => u.owner === this.me() && u.type !== 'castle').map(u => u.id));
+    this.onChange();
+  }
+  clearSelection() { this.selected.clear(); this.cancel(); this.onChange(); }
 
   private keydown(e: KeyboardEvent) {
     if ((e.target as HTMLElement)?.tagName === 'INPUT') return;
@@ -215,7 +317,7 @@ export class Controls {
     if (k.has('arrowright')) p.x += 1;
     if (k.has('arrowup')) p.z -= 1;
     if (k.has('arrowdown')) p.z += 1;
-    if (this.mouse.in && !this.drag?.moved) {
+    if (this.mouse.in && !this.drag?.moved && !this.isTouch) {
       const m = 14;
       if (this.mouse.x < m) p.x -= 1; if (this.mouse.x > innerWidth - m) p.x += 1;
       if (this.mouse.y < m) p.z -= 1; if (this.mouse.y > innerHeight - m) p.z += 1;

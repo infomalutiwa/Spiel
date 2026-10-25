@@ -8,6 +8,7 @@ import { Controls } from './input/controls';
 import { Ui, reasonText } from './ui/ui';
 import { showGallery } from './gallery';
 import { audio } from './audio';
+import { standalone } from './pwa';
 
 const canvas = document.getElementById('c') as HTMLCanvasElement;
 const world = new World(canvas, MAPS[DEFAULT_MAP]);
@@ -64,6 +65,7 @@ async function enter(c: Connection) {
 /** attach a (new) connection to the running game */
 function wire(c: Connection, first = false) {
   conn = c;
+  if (document.hidden) c.send({ t: 'vis', hidden: true });
   controls!.setConnection(c);
   c.onSnapshot = s => {
     fx.schedule(s.events, INTERP_MS);
@@ -115,6 +117,24 @@ addEventListener('pointerdown', e => {
   audio.unlock();
   if ((e.target as HTMLElement | null)?.closest('button')) audio.play('click', 0.5);
 }, { capture: true });
+// iOS only lets audio start from touchend/click, not pointerdown
+for (const t of ['touchend', 'click']) addEventListener(t, () => audio.unlock(), { capture: true });
+// stop the browser's own pinch / double-tap zoom and long-press menus while playing
+addEventListener('gesturestart', e => e.preventDefault());
+addEventListener('contextmenu', e => { if ((e.target as HTMLElement).id === 'c') e.preventDefault(); });
+
+// fullscreen + landscape lock where the browser allows it (Android Chrome); an installed app is already fullscreen
+if (document.fullscreenEnabled && !standalone() && matchMedia('(pointer: coarse)').matches) {
+  const fs = document.createElement('button');
+  fs.id = 'fs'; fs.title = 'Vollbild'; fs.textContent = '⛶';
+  fs.onclick = async () => {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else { await document.documentElement.requestFullscreen(); await (screen.orientation as unknown as { lock?: (o: string) => Promise<void> }).lock?.('landscape'); }
+    } catch { /* not allowed – fine */ }
+  };
+  document.body.appendChild(fs);
+}
 const mute = document.createElement('button');
 mute.id = 'mute'; mute.title = 'Ton an/aus (M)';
 const showMute = () => { mute.textContent = audio.muted ? '🔇' : '🔊'; };
@@ -122,3 +142,6 @@ mute.onclick = () => { audio.unlock(); audio.toggleMute(); showMute(); };
 showMute();
 document.body.appendChild(mute);
 addEventListener('keydown', e => { if (e.key.toLowerCase() === 'm' && !(e.target instanceof HTMLInputElement)) { audio.unlock(); audio.toggleMute(); showMute(); } });
+
+// the game waits while either of you has the tab / app in the background
+document.addEventListener('visibilitychange', () => conn?.send({ t: 'vis', hidden: document.hidden }));

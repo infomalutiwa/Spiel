@@ -112,6 +112,73 @@ button { font-family: inherit; color: inherit; cursor: pointer; }
 .mapcard b { display: block; font-size: 18px; }
 .mapcard span { display: block; font-size: 12.5px; line-height: 1.15; color: var(--brown2); font-weight: 700; margin-top: 3px; }
 .mapcard .sw { height: 46px; border-radius: 12px; margin-bottom: 6px; }
-@media (max-width: 1100px) { .minimap { display: none; } }
+@media (max-width: 1100px) and (pointer: fine) { .minimap { display: none; } }
 
-#mute { position: fixed; top: 10px; right: 10px; z-index: 50; width: 38px; height: 38px; border-radius: 50%; border: 0; cursor: pointer; font-size: 18px; background: rgba(40,30,20,.55); color: #fff; backdrop-filter: blur(4px); }
+#mute, #fs { position: fixed; right: max(10px, env(safe-area-inset-right)); top: 10px; z-index: 50; width: 38px; height: 38px; border-radius: 50%; border: 0; cursor: pointer; font-size: 18px; background: rgba(40,30,20,.55); color: #fff; backdrop-filter: blur(4px); }
+
+#fs { top: 54px; }
+.players { margin-right: 46px; }
+
+/* ---- phones & tablets ---- */
+html, body { position: fixed; width: 100%; overscroll-behavior: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+canvas#c, #selbox { touch-action: none; }
+.touchonly { display: none; }
+#rotate { display: none; position: fixed; inset: 0; z-index: 100; background: #f5d9b4; color: var(--brown); text-align: center; place-items: center; font-size: 22px; }
+#rotate .rot { font-size: 64px; animation: rot 2.4s ease-in-out infinite; }
+@keyframes rot { 0%, 25% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
+@media (orientation: portrait) and (pointer: coarse) { #rotate { display: grid; } }
+.btn.small { font-size: 16px; padding: 6px 16px; }
+.install { margin-top: 12px; }
+.install .hint { margin: 0; font-size: 14px; }
+@media (pointer: coarse) {
+  .touchonly { display: flex; }
+  .ob.touchonly { display: block; }
+  .key, .tip { display: none !important; }
+  .card, .ob, .btn, .mapcard { touch-action: manipulation; }
+  .card:hover, .ob:hover, .mapcard:hover { transform: none; }
+}
+.topbar { left: max(14px, env(safe-area-inset-left)); right: max(14px, env(safe-area-inset-right)); }
+.bottom { padding-left: max(14px, env(safe-area-inset-left)); padding-right: max(14px, env(safe-area-inset-right)); bottom: max(12px, env(safe-area-inset-bottom)); }
+
+/* short landscape screens (phones) */
+@media (max-height: 560px) {
+  .topbar { top: 6px; }
+  .pill { padding: 3px 10px; font-size: 14px; border-width: 2px; }
+  .coin { width: 15px; height: 15px; }
+  .bar { width: 96px; height: 13px; border-width: 2px; }
+  .wave { font-size: 15px; } .timer { font-size: 20px; } .sub { font-size: 11px; }
+  .preview { font-size: 11px; max-width: 340px; padding: 2px 8px; margin-top: 2px; }
+  .players { gap: 3px; } .pl { font-size: 13px; }
+  .panel { padding: 5px 8px; border-width: 2px; border-radius: 14px; }
+  .bottom { bottom: max(6px, env(safe-area-inset-bottom)); gap: 8px; justify-content: flex-start; }
+  .shop, .orders { gap: 4px; padding: 5px 6px; }
+  .card { width: 68px; padding: 2px 1px 4px; border-width: 2px; border-radius: 12px; }
+  .card img { width: 46px; height: 46px; margin-bottom: -2px; }
+  .card .nm { font-size: 10px; letter-spacing: -.2px; white-space: nowrap; } .card .cost { font-size: 12px; } .card .cost .coin { width: 11px; height: 11px; }
+  .ob { min-width: 52px; padding: 4px 5px 3px; font-size: 11px; border-width: 2px; border-radius: 12px; }
+  .ob .ic { font-size: 17px; }
+  .sep { margin: 0 1px; }
+  .ready { min-width: 96px; font-size: 15px; padding: 8px 10px; }
+  .sel { top: 52px; bottom: auto; left: max(14px, env(safe-area-inset-left)); min-width: 0; font-size: 11px; padding: 4px 10px; max-width: 220px; }
+  .sel b { font-size: 14px; }
+  .hintbar { bottom: 92px; font-size: 12px; padding: 3px 12px; }
+  .toast { top: 54px; font-size: 13px; padding: 3px 12px; }
+  .minimap { right: max(10px, env(safe-area-inset-right)); bottom: max(6px, env(safe-area-inset-bottom)); padding: 3px; border-width: 2px; border-radius: 12px; }
+  .minimap canvas { width: 92px; height: auto; }
+  .banner { top: 30%; } .banner p { font-size: 16px; }
+  .overlay .panel { padding: 14px 22px; } .overlay h2 { font-size: 28px; } .bigcode { font-size: 40px; letter-spacing: 8px; }
+  #mute, #fs { width: 32px; height: 32px; font-size: 15px; top: 6px; } #fs { top: 44px; }
+  .players { margin-right: 40px; }
+  /* lobby */
+  #lobby { overflow-y: auto; align-items: start; padding: 8px 0; }
+  .lobbycard { padding: 10px 18px 12px; width: min(720px, 94vw); }
+  .title { font-size: 40px; }
+  .subtitle { margin: 4px 0 8px; font-size: 14px; }
+  .maps { margin: 2px 0 8px; gap: 6px; flex-wrap: nowrap; }
+  .mapcard { width: 33%; padding: 6px; } .mapcard b { font-size: 14px; } .mapcard span { font-size: 10.5px; } .mapcard .sw { height: 22px; margin-bottom: 3px; }
+  .btn { font-size: 16px; padding: 7px 18px; }
+  .codeinput { font-size: 20px; width: 110px; padding: 4px 8px; letter-spacing: 6px; }
+  .lobbycard .hint { margin: 8px 0 4px !important; font-size: 13px; }
+  .err { min-height: 16px; margin-top: 4px; font-size: 13px; }
+  .install { margin-top: 6px; }
+}
