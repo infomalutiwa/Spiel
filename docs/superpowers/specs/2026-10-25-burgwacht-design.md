@@ -26,7 +26,7 @@ Anspruch: hochwertig, professionell, **cozy** (warme Farben, weiches Licht, freu
 
 ## Architektur
 - **Client** (Three.js, TypeScript, Vite): Rendering, Kamera, Auswahl/Befehle, UI.
-- **Server** (Node.js, Colyseus): autoritativer Spielzustand, Kampf, KI, Wellen. Clients senden Befehle, empfangen Zustand.
+- **Server** (Node.js, `ws` WebSocket, eigenes Raum-System): autoritativer Spielzustand, Kampf, KI, Wellen. Clients senden Befehle, empfangen Zustand.
 - **Shared**: Truppenwerte, Regeln, Wellen- und Map-Definitionen (Datendateien), von beiden Seiten genutzt.
 - Verbinden: Raum erstellen, Code/Link teilen.
 
