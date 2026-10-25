@@ -25,6 +25,16 @@ PORT=8080 npm start  # ein Prozess: liefert Client + WebSocket auf demselben Por
 
 Hinter einem Reverse-Proxy (nginx, Caddy, …) muss WebSocket-Weiterleitung aktiv sein. Bei HTTPS nutzt der Client automatisch `wss://`.
 
+## Kostenlos online stellen (Render)
+
+Ein einziger Dienst liefert Client und Spielserver, ohne eigene Domain und ohne Kreditkarte:
+
+1. Auf https://render.com mit dem GitHub-Konto anmelden.
+2. **New → Blueprint**, das Repo `Spiel` wählen (die `render.yaml` wird erkannt), **Apply**.
+3. Nach dem Build läuft das Spiel unter `https://burgwacht-xxxx.onrender.com`. Den Link schickst du deiner Freundin.
+
+Der Gratis-Tarif schläft nach ca. 15 Minuten ohne Verkehr ein; das erste Laden danach dauert etwa eine Minute. Während ihr spielt, bleibt er wach. Beim Einschlafen gehen offene Räume verloren.
+
 ## Online stellen mit Firebase
 
 Firebase Hosting liefert nur statische Dateien – der Spielserver (WebSockets) läuft deshalb als **Cloud Run**-Dienst im selben Google-Cloud-Projekt, den Client liefert Firebase Hosting.
