@@ -4,13 +4,15 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 const loader = new GLTFLoader();
 const WARM_GREEN = new THREE.Color('#8ec45a');
 const cache = new Map<string, Promise<THREE.Group | null>>();
-const BASE = `${import.meta.env.BASE_URL}assets/models/`;
+const ROOT = `${import.meta.env.BASE_URL}assets/`;
+/** 'hex/foo' → assets/hex/foo.gltf (KayKit); anything else → assets/models/foo.glb (Kenney) */
+const urlFor = (name: string) => (name.startsWith('hex/') ? `${ROOT}${name}.gltf` : `${ROOT}models/${name}.glb`);
 
 /** load a CC0 model once; null when the file is missing so callers can fall back */
 export function loadModel(name: string): Promise<THREE.Group | null> {
   let p = cache.get(name);
   if (!p) {
-    p = loader.loadAsync(`${BASE}${name}.glb`).then(g => {
+    p = loader.loadAsync(urlFor(name)).then(g => {
       g.scene.traverse(o => {
         const m = o as THREE.Mesh;
         if (m.isMesh) {

@@ -3,11 +3,14 @@ import { castleOf, rand } from './state';
 import { gridOf } from './grid';
 
 /** walk u toward (gx,gy) by up to speed*dt; returns true once arrived */
+/** the maps are big: everyone covers ground this much faster than their listed speed */
+export const SPEED_SCALE = 1.6;
+
 export function moveToward(u: Unit, gx: number, gy: number, dt: number, speedMul = 1): boolean {
   const def = UNIT_DEFS[u.type];
   const dx = gx - u.x, dy = gy - u.y;
   const d = Math.hypot(dx, dy);
-  const step = def.speed * speedMul * dt;
+  const step = def.speed * SPEED_SCALE * speedMul * dt;
   u.anim = 1;
   if (d <= Math.max(step, 0.05)) {
     if (d > 0.001) u.facing = Math.atan2(dy, dx);

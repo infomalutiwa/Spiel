@@ -1,5 +1,6 @@
-import { createServer } from 'node:http';
+import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { readFile } from 'node:fs/promises';
+import { gzipSync } from 'node:zlib';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer, type WebSocket } from 'ws';
@@ -11,23 +12,34 @@ const DIST = join(fileURLToPath(new URL('.', import.meta.url)), '../../../client
 const MIME: Record<string, string> = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json',
   '.glb': 'model/gltf-binary', '.gltf': 'model/gltf+json', '.png': 'image/png', '.jpg': 'image/jpeg',
-  '.svg': 'image/svg+xml', '.wasm': 'application/wasm', '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg',
+  '.svg': 'image/svg+xml', '.bin': 'application/octet-stream', '.wasm': 'application/wasm', '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg',
+};
+
+const COMPRESSIBLE = new Set(['.html', '.js', '.css', '.json', '.gltf', '.bin', '.glb', '.svg', '.wasm']);
+const gzCache = new Map<string, Buffer>();
+const send = (req: IncomingMessage, res: ServerResponse, file: string, data: Buffer, type: string) => {
+  const gz = COMPRESSIBLE.has(extname(file)) && data.length > 1024 && /\bgzip\b/.test(String(req.headers['accept-encoding'] ?? ''));
+  const headers: Record<string, string> = { 'content-type': type, 'cache-control': file.includes('/assets/') && !file.endsWith('index.html') ? 'public, max-age=3600' : 'no-cache' };
+  if (!gz) { res.writeHead(200, headers); return res.end(data); }
+  let z = gzCache.get(file);
+  if (!z) { z = gzipSync(data, { level: 6 }); if (gzCache.size < 400) gzCache.set(file, z); }
+  res.writeHead(200, { ...headers, 'content-encoding': 'gzip', vary: 'accept-encoding' });
+  res.end(z);
 };
 
 const http = createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', 'http://x');
+  if (url.pathname === '/healthz') { res.writeHead(200, { 'content-type': 'text/plain' }); return res.end('ok'); }
   const rel = normalize(decodeURIComponent(url.pathname)).replace(/^(\.\.[/\\])+/, '');
   const file = join(DIST, rel === '/' || rel === '\\' ? 'index.html' : rel);
   try {
     if (!file.startsWith(DIST)) throw new Error('outside');
     const data = await readFile(file);
-    res.writeHead(200, { 'content-type': MIME[extname(file)] ?? 'application/octet-stream' });
-    res.end(data);
+    send(req, res, file, data, MIME[extname(file)] ?? 'application/octet-stream');
   } catch {
     try {
-      const data = await readFile(join(DIST, 'index.html'));
-      res.writeHead(200, { 'content-type': MIME['.html'] });
-      res.end(data);
+      const idx = join(DIST, 'index.html');
+      send(req, res, idx, await readFile(idx), MIME['.html']);
     } catch {
       res.writeHead(404); res.end('client not built – run `npm run build`');
     }
@@ -35,7 +47,12 @@ const http = createServer(async (req, res) => {
 });
 
 const rooms = new RoomRegistry();
-const wss = new WebSocketServer({ server: http, maxPayload: 16 * 1024 });
+// optional: ALLOWED_ORIGINS=https://my-game.web.app,https://my-game.firebaseapp.com keeps other sites from using this server
+const ALLOWED = (process.env.ALLOWED_ORIGINS ?? '').split(',').map(o => o.trim()).filter(Boolean);
+const wss = new WebSocketServer({
+  server: http, maxPayload: 16 * 1024,
+  verifyClient: ({ origin }: { origin?: string }) => ALLOWED.length === 0 || (!!origin && ALLOWED.includes(origin)),
+});
 setInterval(() => rooms.sweep(), 60_000).unref();
 
 // half-open connections (sleeping laptop, dropped wifi) never emit 'close': ping everyone and cut those that stay silent

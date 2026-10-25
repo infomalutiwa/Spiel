@@ -1,4 +1,5 @@
 import { MAPS, DEFAULT_MAP } from '@burgwacht/shared';
+import { Minimap } from './ui/minimap';
 import { Connection, interpolation } from './net/connection';
 import { World } from './render/scene';
 import { UnitViews } from './render/units';
@@ -14,6 +15,7 @@ const fx = new Effects(world, views);
 const ui = new Ui();
 let conn: Connection | undefined;
 let controls: Controls | undefined;
+let minimap: Minimap | undefined;
 
 const INTERP_MS = 120;
 let last = performance.now();
@@ -30,10 +32,13 @@ function loop(now: number) {
     world.setPlacementZone(s?.phase === 'prep');
     fx.update(dt);
     controls.frame(dt);
+    minimap?.draw(s, conn.you);
   } else if (gallery) { world.frame(dt, { x: 0, z: 0 }, 0); }
   else { // lobby: slow cinematic orbit over the castle
     lobbyAngle += dt * 0.08;
-    world.target.set(30 + Math.sin(lobbyAngle) * 8, 0, 45);
+    const cs = world.map.castle;
+    world.target.set(cs.x + 8 + Math.sin(lobbyAngle) * 10, 0, cs.y);
+    world.dist = 78; world.pitch = 0.62;
     world.yaw = Math.sin(lobbyAngle * 0.7) * 0.35;
     world.frame(dt, { x: 0, z: 0 }, 0);
   }
@@ -44,11 +49,14 @@ requestAnimationFrame(loop);
 async function enter(c: Connection) {
   history.replaceState(null, '', `?room=${c.code}`);
   ui.hideLobby();
+  world.setMap(MAPS[c.mapId] ?? MAPS[DEFAULT_MAP]);
   conn = c;
   controls = new Controls(world, views, c, () => c.latest());
   ui.buildHud(c, controls);
   controls.onError = m => ui.toast(m, true);
-  world.target.set(52, 0, 45); world.yaw = 0; world.dist = 70;
+  const cs = world.map.castle;
+  world.target.set(cs.x + 34, 0, cs.y); world.yaw = 0; world.dist = 95; world.pitch = 0.95;
+  minimap = new Minimap(world, document.getElementById('ui')!);
   wire(c, true);
 }
 
@@ -89,8 +97,9 @@ async function reconnect(code: string) {
 const params = new URLSearchParams(location.search);
 const preset = params.get('room')?.toUpperCase() ?? undefined;
 const gallery = params.has('gallery');
-if (gallery) showGallery(world); else ui.showLobby({
-  create: async () => enter(await Connection.open()),
+if (gallery) void showGallery(world); else ui.showLobby({
+  preview: id => world.setMap(MAPS[id]),
+  create: async mapId => enter(await Connection.open(undefined, mapId)),
   join: async code => {
     if (code.length !== 4) throw new Error('room_not_found');
     await enter(await Connection.open(code));

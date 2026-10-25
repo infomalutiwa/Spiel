@@ -4,6 +4,7 @@ import {
 import type { Controls } from '../input/controls';
 import type { Connection } from '../net/connection';
 import { renderPortraits } from '../render/portraits';
+import { MAPS } from '@burgwacht/shared';
 
 const REASONS: Record<string, string> = {
   not_enough_gold: 'Nicht genug Gold', outside_zone: 'Hier darfst du nicht aufstellen – nimm die helle Fläche',
@@ -25,10 +26,22 @@ const INFO: Record<TroopType, { role: string; strong: string; weak: string }> = 
 };
 const FORM: Record<Formation, string> = { line: 'Linie', wedge: 'Keil', block: 'Block' };
 
+/** where a wave group comes from, as a compass direction relative to the castle */
+function compass(map: (typeof MAPS)[string], lane: number): string {
+  const sp = map.spawns[lane % map.spawns.length];
+  const dx = sp.x - map.castle.x, dy = sp.y - map.castle.y;
+  const ns = Math.abs(dy) > Math.abs(dx) * 0.45 ? (dy < 0 ? 'Nord' : 'Süd') : '', ew = Math.abs(dx) > Math.abs(dy) * 0.45 ? (dx < 0 ? 'west' : 'ost') : '';
+  return ns && ew ? `${ns}${ew}en` : ns ? `${ns}en` : `${ew[0].toUpperCase()}${ew.slice(1)}en`;
+}
+
 const $ = <T extends HTMLElement>(sel: string, root: ParentNode = document) => root.querySelector(sel) as T;
 const el = (html: string) => { const t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstElementChild as HTMLElement; };
 
-export interface LobbyHandlers { create(): Promise<void>; join(code: string): Promise<void> }
+export interface LobbyHandlers { create(mapId: string): Promise<void>; join(code: string): Promise<void>; preview(mapId: string): void }
+
+const SWATCH: Record<string, string> = {
+  meadow: 'linear-gradient(135deg,#9fd078,#7db860 55%,#e0bd8b)', forest: 'linear-gradient(135deg,#5f9e50,#3f7d3f 55%,#c9ad84)', valley: 'linear-gradient(135deg,#d9bb68,#a8c862 55%,#e1c18e)',
+};
 
 export class Ui {
   root = document.getElementById('ui')!;
@@ -48,6 +61,7 @@ export class Ui {
       <div id="lobby"><div class="panel lobbycard">
         <h1 class="title">Burgwacht</h1>
         <p class="subtitle">Verteidigt gemeinsam eure Burg – Seite an Seite.</p>
+        <div class="maps" id="maps">${Object.values(MAPS).map((m, i) => `<button class="mapcard${i === 0 ? ' on' : ''}" data-map="${m.id}"><div class="sw" style="background:${SWATCH[m.id]}"></div><b>${m.name}</b><span>${m.blurb}</span></button>`).join('')}</div>
         <div class="row"><button class="btn green" id="create">Neues Spiel starten</button></div>
         <p class="hint" style="margin:18px 0 8px">oder einem Raum beitreten</p>
         <div class="row"><input class="codeinput" id="code" maxlength="4" placeholder="ABCD" autocomplete="off" />
@@ -61,7 +75,14 @@ export class Ui {
       btn.disabled = true; err.textContent = '';
       p.catch(e => { err.textContent = reasonText(String(e.message ?? e)); btn.disabled = false; });
     };
-    $<HTMLButtonElement>('#create', this.lobby).onclick = ev => wrap(h.create(), ev.currentTarget as HTMLButtonElement);
+    let mapId = Object.keys(MAPS)[0];
+    $('#maps', this.lobby).onclick = ev => {
+      const b = (ev.target as HTMLElement).closest<HTMLElement>('.mapcard'); if (!b) return;
+      mapId = b.dataset.map!;
+      this.lobby!.querySelectorAll('.mapcard').forEach(c => c.classList.toggle('on', c === b));
+      h.preview(mapId);
+    };
+    $<HTMLButtonElement>('#create', this.lobby).onclick = ev => wrap(h.create(mapId), ev.currentTarget as HTMLButtonElement);
     $<HTMLButtonElement>('#join', this.lobby).onclick = ev => wrap(h.join(code.value.trim()), ev.currentTarget as HTMLButtonElement);
     code.onkeydown = ev => { if (ev.key === 'Enter') $<HTMLButtonElement>('#join', this.lobby!).click(); };
   }
@@ -88,7 +109,6 @@ export class Ui {
 
   /* ---------- HUD ---------- */
   buildHud(conn: Connection, controls: Controls) {
-    this.portraits = renderPortraits(conn.you);
     const tip = el(`<div class="panel tip" style="display:none"></div>`);
     document.body.appendChild(tip);
     this.hud = el(`
@@ -115,7 +135,7 @@ export class Ui {
     const shop = $('#shop', this.hud);
     TROOP_ORDER.forEach((t, i) => {
       const d = TROOPS[t];
-      const c = el(`<button class="card"><kbd>${i + 1 > 3 ? '' : ''}</kbd><img alt="${d.name}" src="${this.portraits[t]}" />
+      const c = el(`<button class="card"><kbd>${i + 1 > 3 ? '' : ''}</kbd><img alt="${d.name}" src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" />
         <div class="nm">${d.name}</div><div class="cost"><span class="coin"></span>${d.cost}</div></button>`);
       c.querySelector('kbd')?.remove();
       c.onclick = () => {
@@ -136,6 +156,8 @@ export class Ui {
       c.onmouseleave = () => { tip.style.display = 'none'; };
       shop.appendChild(c); this.cardEls.set(t, c);
     });
+
+    void renderPortraits(conn.you, (t, url) => { const im = this.cardEls.get(t)?.querySelector('img'); if (im) im.src = url; });
 
     const orders = $('#orders', this.hud);
     orders.innerHTML = `
@@ -222,10 +244,10 @@ export class Ui {
       timer.textContent = ''; sub.textContent = `Kampf: ${waveName}`;
     } else { timer.textContent = ''; sub.textContent = ''; }
 
-    const lanes = ['oben', 'Mitte', 'unten'];
+    const map = MAPS[conn.mapId] ?? MAPS.meadow;
     $('#preview', this.hud).textContent = s.phase === 'prep'
       ? 'Als Nächstes: ' + WAVES[Math.min(s.wave, WAVES.length - 1)].groups
-        .map(g => `${g.count}× ${UNIT_DEFS[g.type].name} (${lanes[g.lane]})`).join(', ')
+        .map(g => `${Math.max(1, Math.round(g.count * map.waveScale))}× ${UNIT_DEFS[g.type].name} (${compass(map, g.lane)})`).join(', ')
       : '';
     $('#players', this.hud).innerHTML = ([0, 1] as PlayerId[]).map(p => {
       const colors = ['#4a94d9', '#ee7f9b'];

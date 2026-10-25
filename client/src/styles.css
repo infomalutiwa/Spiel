@@ -103,3 +103,13 @@ button { font-family: inherit; color: inherit; cursor: pointer; }
 @media (max-width: 900px) { .card { width: 78px; } .card img { width: 62px; height: 62px; } .bar { width: 120px; } }
 .preview { max-width: 520px; margin: 4px auto 0; padding: 4px 14px; background: rgba(255, 246, 228, .85); border-radius: 14px; font-size: 14px; line-height: 1.2; }
 .preview:empty { display: none; }
+.minimap { position: absolute; right: 14px; bottom: 14px; padding: 6px; border-radius: 16px; line-height: 0; pointer-events: auto; }
+.minimap canvas { border-radius: 11px; cursor: crosshair; display: block; touch-action: none; }
+.maps { display: flex; gap: 10px; justify-content: center; margin: 4px 0 18px; flex-wrap: wrap; }
+.mapcard { width: 150px; padding: 10px 10px 12px; border-radius: 18px; border: 3px solid transparent; background: #fffaf0; box-shadow: 0 4px 0 rgba(90, 70, 50, .15); text-align: center; transition: transform .1s, border-color .1s; }
+.mapcard:hover { transform: translateY(-3px); border-color: var(--orange); }
+.mapcard.on { border-color: var(--orange2); background: #fff0cf; }
+.mapcard b { display: block; font-size: 18px; }
+.mapcard span { display: block; font-size: 12.5px; line-height: 1.15; color: var(--brown2); font-weight: 700; margin-top: 3px; }
+.mapcard .sw { height: 46px; border-radius: 12px; margin-bottom: 6px; }
+@media (max-width: 1100px) { .minimap { display: none; } }

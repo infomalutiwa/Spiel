@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { UNIT_DEFS, WAVES, MAPS, START_GOLD, type Command } from '@burgwacht/shared';
-import { createGame, applyCommand, resolveDamage, castAbility, tick, stepMovement, separate, getUnit } from './index';
+import { createGame, applyCommand, resolveDamage, castAbility, tick, stepMovement, separate, getUnit, SPEED_SCALE } from './index';
 import { battle, mine, foe, run } from './helpers';
 
 describe('movement', () => {
@@ -10,7 +10,7 @@ describe('movement', () => {
     u.order = { kind: 'move', x: 50, y: 40 };
     const before = u.x;
     stepMovement(s, 0.05);
-    expect(u.x - before).toBeLessThanOrEqual(UNIT_DEFS.knight.speed * 0.05 + 1e-9);
+    expect(u.x - before).toBeLessThanOrEqual(UNIT_DEFS.knight.speed * SPEED_SCALE * 0.05 + 1e-9);
     run(s, 6);
     expect(Math.hypot(u.x - 50, u.y - 40)).toBeLessThan(0.5);
     expect(u.order.kind).toBe('idle');

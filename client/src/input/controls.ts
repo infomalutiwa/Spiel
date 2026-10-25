@@ -1,12 +1,12 @@
 import * as THREE from 'three';
 import {
-  MAPS, UNIT_DEFS, type AbilityId, type Command, type Formation, type Snapshot, type TroopType, type UnitSnap,
+  UNIT_DEFS, type AbilityId, type Command, type Formation, type Snapshot, type TroopType, type UnitSnap,
 } from '@burgwacht/shared';
 import type { Connection } from '../net/connection';
 import type { World } from '../render/scene';
 import type { UnitViews } from '../render/units';
-import { PAL } from '../render/palette';
-import { buildRig } from '../render/models';
+import { loadBaked } from '../render/baked';
+import { modelInstance } from '../render/assets';
 
 export type Mode =
   | { k: 'select' }
@@ -163,7 +163,7 @@ export class Controls {
     if (!this.selected.size) return;
     const phase = this.phase();
     if (phase === 'prep') {
-      const z = MAPS.meadow.placeZone;
+      const z = this.world.map.placeZone;
       this.send({ c: 'place', ids: this.ids(), x: Math.min(z.x1, Math.max(z.x0, g.x)), y: Math.min(z.y1, Math.max(z.y0, g.y)) });
     } else if (phase === 'battle') {
       const foe = this.pick(g, false);
@@ -227,18 +227,30 @@ export class Controls {
     const g = this.mouse.in ? this.world.screenToGround(this.mouse.x, this.mouse.y) : undefined;
     if (mode.k === 'buy' && g) {
       if (this.ghostFor !== mode.troop) {
+        const troop = mode.troop;
         if (this.ghost) this.world.scene.remove(this.ghost);
-        const rig = buildRig(mode.troop, PAL.team[this.me()], false, 5);
-        rig.root.traverse(o => {
-          const m = o as THREE.Mesh;
-          if (m.isMesh) { m.material = (m.material as THREE.Material).clone(); (m.material as THREE.Material).transparent = true; (m.material as THREE.Material).opacity = 0.62; m.castShadow = false; }
-        });
-        rig.root.rotation.y = Math.PI / 2;
-        this.ghost = rig.root; this.ghostFor = mode.troop; this.world.scene.add(rig.root);
+        this.ghost = undefined; this.ghostFor = troop;
+        const tint = this.me() === 0 ? new THREE.Color(0.85, 0.97, 1.25) : new THREE.Color(1.25, 0.88, 0.97);
+        void (async () => {
+          let obj: THREE.Object3D | null = null;
+          if (troop === 'catapult') obj = await modelInstance('siege-catapult', 4.6);
+          else {
+            const m = await loadBaked(troop);
+            if (m) {
+              const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, transparent: true, opacity: 0.62 });
+              mat.color.copy(tint);
+              obj = new THREE.Mesh(m.frames[m.clips.idle[0]], mat);
+              obj.scale.setScalar(1.45);
+            }
+          }
+          if (!obj || this.ghostFor !== troop) return;
+          obj.rotation.y = Math.PI / 2;
+          const g = new THREE.Group(); g.add(obj); this.ghost = g; this.world.scene.add(g);
+        })();
       }
-      const zn = MAPS.meadow.placeZone;
+      const zn = this.world.map.placeZone;
       const ok = g.x >= zn.x0 && g.x <= zn.x1 && g.y >= zn.y0 && g.y <= zn.y1;
-      this.ghost!.visible = true; this.ghost!.position.set(g.x, 0, g.y);
+      if (this.ghost) { this.ghost.visible = true; this.ghost.position.set(g.x, 0, g.y); }
       this.ringGhost.visible = true; this.ringGhost.position.set(g.x, 0.15, g.y);
       this.ringGhost.scale.setScalar(Math.max(1.4, UNIT_DEFS[mode.troop].radius * 1.7));
       (this.ringGhost.material as THREE.MeshBasicMaterial).color.set(ok ? '#fff3c4' : '#ff8d8d');

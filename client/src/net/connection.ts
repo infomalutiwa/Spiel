@@ -1,4 +1,4 @@
-import type { ClientMsg, Command, PlayerId, ServerMsg, Snapshot } from '@burgwacht/shared';
+import { fromWire, type ClientMsg, type Command, type PlayerId, type ServerMsg, type Snapshot } from '@burgwacht/shared';
 
 export interface Timed { at: number; snap: Snapshot }
 
@@ -6,6 +6,7 @@ export interface Timed { at: number; snap: Snapshot }
 export class Connection {
   you: PlayerId = 0;
   code = '';
+  mapId = 'meadow';
   peerConnected = false;
   snaps: Timed[] = [];
   onSnapshot: (s: Snapshot) => void = () => {};
@@ -16,24 +17,27 @@ export class Connection {
 
   static url(): string {
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    // Firebase Hosting only serves static files: the game server lives elsewhere (Cloud Run) and is baked in at build time
+    const remote = import.meta.env.VITE_SERVER_URL as string | undefined;
+    if (remote) return remote.replace(/^http/, 'ws');
     return import.meta.env.DEV ? `${proto}://${location.hostname}:2567` : `${proto}://${location.host}`;
   }
 
   /** open a socket and either create a room (no code) or join one */
-  static open(code?: string): Promise<Connection> {
+  static open(code?: string, mapId?: string): Promise<Connection> {
     return new Promise((resolve, reject) => {
       const c = new Connection();
       c.ws = new WebSocket(Connection.url());
       let settled = false;
       c.ws.onopen = () => {
         const saved = code ? sessionStorage.getItem(`bw-token-${code.toUpperCase()}`) ?? undefined : undefined;
-        c.send(code ? { t: 'join', code: code.toUpperCase(), token: saved } : { t: 'create' });
+        c.send(code ? { t: 'join', code: code.toUpperCase(), token: saved } : { t: 'create', mapId });
       };
       c.ws.onmessage = ev => {
         const m: ServerMsg = JSON.parse(ev.data);
         switch (m.t) {
           case 'joined':
-            c.you = m.you; c.code = m.code;
+            c.you = m.you; c.code = m.code; c.mapId = m.mapId;
             try { sessionStorage.setItem(`bw-token-${m.code}`, m.token); } catch { /* private mode */ }
             settled = true; resolve(c);
             break;
@@ -42,9 +46,10 @@ export class Connection {
             break;
           case 'peer': c.peerConnected = m.connected; c.onPeer(m.connected); break;
           case 'snap':
-            c.snaps.push({ at: performance.now(), snap: m.s });
-            if (c.snaps.length > 6) c.snaps.shift();
-            c.onSnapshot(m.s);
+            { const snap = fromWire(m.s);
+              c.snaps.push({ at: performance.now(), snap });
+              if (c.snaps.length > 6) c.snaps.shift();
+              c.onSnapshot(snap); }
             break;
         }
       };
