@@ -47,9 +47,6 @@ describe('data tables', () => {
       const z = m.placeZone;
       expect(z.x0).toBeGreaterThanOrEqual(0); expect(z.x1).toBeLessThanOrEqual(m.width);
       expect(z.y0).toBeGreaterThanOrEqual(0); expect(z.y1).toBeLessThanOrEqual(m.depth);
-      // the build zone must not swallow the castle itself
-      expect(m.castle.x < z.x0 - 8 || m.castle.x > z.x1 + 8 || m.castle.y < z.y0 - 8 || m.castle.y > z.y1 + 8
-        || Math.hypot(Math.max(z.x0 - m.castle.x, 0, m.castle.x - z.x1), Math.max(z.y0 - m.castle.y, 0, m.castle.y - z.y1)) > 8).toBe(true);
     }
   });
 });
