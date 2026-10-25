@@ -1,0 +1,278 @@
+import {
+  TROOP_ORDER, TROOPS, UNIT_DEFS, WAVES, type AbilityId, type Formation, type PlayerId, type Snapshot, type TroopType,
+} from '@burgwacht/shared';
+import type { Controls } from '../input/controls';
+import type { Connection } from '../net/connection';
+import { renderPortraits } from '../render/portraits';
+
+const REASONS: Record<string, string> = {
+  not_enough_gold: 'Nicht genug Gold', outside_zone: 'Hier darfst du nicht aufstellen – nimm die helle Fläche',
+  not_prep: 'Nur in der Aufstellphase', not_battle: 'Nur im Kampf', cooldown: 'Fähigkeit lädt noch',
+  bad_command: 'Das geht so nicht', room_full: 'Der Raum ist schon voll', room_not_found: 'Diesen Raum gibt es nicht',
+  connection_failed: 'Keine Verbindung zum Server',
+};
+export const reasonText = (r: string) => REASONS[r] ?? r;
+
+const INFO: Record<TroopType, { role: string; strong: string; weak: string }> = {
+  knight: { role: 'Robust im Nahkampf – hält die Linie.', strong: 'Fußvolk, Bogen', weak: 'Magie, Armbrust' },
+  archer: { role: 'Fernkampf, stark gegen leichte Ziele.', strong: 'Leichte Ziele', weak: 'Schwere Rüstung, Reiter' },
+  spearman: { role: 'Doppelt stark gegen Reiter.', strong: 'Reiter', weak: 'Schwere Rüstung' },
+  cavalry: { role: 'Schnell – jagt Bogenschützen.', strong: 'Bogen, Leichte', weak: 'Speere' },
+  crossbowman: { role: 'Langsam, aber durchschlägt Rüstung.', strong: 'Schwere Rüstung', weak: 'Belagerung, Nahkampf' },
+  mage: { role: 'Flächenschaden, bricht dicke Rüstung.', strong: 'Gruppen, Schwere', weak: 'Reiter' },
+  healer: { role: 'Heilt Verbündete in der Nähe.', strong: 'Hält die Armee am Leben', weak: 'Alles – gut beschützen' },
+  catapult: { role: 'Riesige Reichweite, zerstört Belagerungsgerät.', strong: 'Rammen, Katapulte', weak: 'Schnelle Truppen' },
+};
+const FORM: Record<Formation, string> = { line: 'Linie', wedge: 'Keil', block: 'Block' };
+
+const $ = <T extends HTMLElement>(sel: string, root: ParentNode = document) => root.querySelector(sel) as T;
+const el = (html: string) => { const t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstElementChild as HTMLElement; };
+
+export interface LobbyHandlers { create(): Promise<void>; join(code: string): Promise<void> }
+
+export class Ui {
+  root = document.getElementById('ui')!;
+  private hud?: HTMLElement;
+  private lobby?: HTMLElement;
+  private waiting?: HTMLElement;
+  private overlay?: HTMLElement;
+  private portraits: Record<string, string> = {};
+  private lastPhase = '';
+  private lastWave = -1;
+  private toastT = 0;
+  private cardEls = new Map<TroopType, HTMLElement>();
+
+  /* ---------- lobby ---------- */
+  showLobby(h: LobbyHandlers, presetCode?: string) {
+    this.lobby = el(`
+      <div id="lobby"><div class="panel lobbycard">
+        <h1 class="title">Burgwacht</h1>
+        <p class="subtitle">Verteidigt gemeinsam eure Burg – Seite an Seite.</p>
+        <div class="row"><button class="btn green" id="create">Neues Spiel starten</button></div>
+        <p class="hint" style="margin:18px 0 8px">oder einem Raum beitreten</p>
+        <div class="row"><input class="codeinput" id="code" maxlength="4" placeholder="ABCD" autocomplete="off" />
+          <button class="btn" id="join">Beitreten</button></div>
+        <div class="err" id="err"></div>
+      </div></div>`);
+    this.root.appendChild(this.lobby);
+    const err = $('#err', this.lobby), code = $<HTMLInputElement>('#code', this.lobby);
+    if (presetCode) code.value = presetCode;
+    const wrap = (p: Promise<void>, btn: HTMLButtonElement) => {
+      btn.disabled = true; err.textContent = '';
+      p.catch(e => { err.textContent = reasonText(String(e.message ?? e)); btn.disabled = false; });
+    };
+    $<HTMLButtonElement>('#create', this.lobby).onclick = ev => wrap(h.create(), ev.currentTarget as HTMLButtonElement);
+    $<HTMLButtonElement>('#join', this.lobby).onclick = ev => wrap(h.join(code.value.trim()), ev.currentTarget as HTMLButtonElement);
+    code.onkeydown = ev => { if (ev.key === 'Enter') $<HTMLButtonElement>('#join', this.lobby!).click(); };
+  }
+  hideLobby() { this.lobby?.remove(); this.lobby = undefined; }
+
+  /* ---------- waiting for partner ---------- */
+  showWaiting(code: string) {
+    const link = `${location.origin}${location.pathname}?room=${code}`;
+    this.waiting = el(`
+      <div class="overlay"><div class="panel">
+        <h2>Warte auf deine Mitspielerin<span class="dots"></span></h2>
+        <p class="hint">Schick ihr diesen Code oder den Link:</p>
+        <div class="bigcode">${code}</div>
+        <div class="row"><button class="btn" id="copy">Link kopieren</button></div>
+      </div></div>`);
+    this.root.appendChild(this.waiting);
+    $<HTMLButtonElement>('#copy', this.waiting).onclick = async ev => {
+      const b = ev.currentTarget as HTMLButtonElement;
+      try { await navigator.clipboard.writeText(link); b.textContent = 'Kopiert!'; }
+      catch { b.textContent = link; }
+    };
+  }
+  hideWaiting() { this.waiting?.remove(); this.waiting = undefined; }
+
+  /* ---------- HUD ---------- */
+  buildHud(conn: Connection, controls: Controls) {
+    this.portraits = renderPortraits(conn.you);
+    const tip = el(`<div class="panel tip" style="display:none"></div>`);
+    document.body.appendChild(tip);
+    this.hud = el(`
+      <div id="hud">
+        <div class="topbar">
+          <div class="pill castle">🏰<div class="bar"><i id="castleHp" style="width:100%"></i></div><span id="castleTxt"></span></div>
+          <div class="center"><div class="pill"><span class="wave" id="waveTxt"></span></div>
+            <div class="timer" id="timer"></div><div class="sub" id="phaseSub"></div></div>
+          <div class="players" id="players"></div>
+        </div>
+        <div class="toast" id="toast"></div>
+        <div class="banner" id="banner"><h2></h2><p></p></div>
+        <div class="hintbar" id="hint" style="display:none"></div>
+        <div class="panel sel" id="sel"></div>
+        <div class="bottom">
+          <div class="panel shop" id="shop"></div>
+          <div class="panel orders" id="orders" style="display:none"></div>
+          <div class="panel orders" id="side"></div>
+        </div>
+      </div>`);
+    this.root.appendChild(this.hud);
+
+    const shop = $('#shop', this.hud);
+    TROOP_ORDER.forEach((t, i) => {
+      const d = TROOPS[t];
+      const c = el(`<button class="card"><kbd>${i + 1 > 3 ? '' : ''}</kbd><img alt="${d.name}" src="${this.portraits[t]}" />
+        <div class="nm">${d.name}</div><div class="cost"><span class="coin"></span>${d.cost}</div></button>`);
+      c.querySelector('kbd')?.remove();
+      c.onclick = () => {
+        const active = controls.mode.k === 'buy' && controls.mode.troop === t;
+        controls.setMode(active ? { k: 'select' } : { k: 'buy', troop: t });
+      };
+      c.onmouseenter = () => {
+        const inf = INFO[t];
+        tip.innerHTML = `<b>${d.name}</b><div>${inf.role}</div><div class="st">
+          <span>Leben</span><span>${d.hp}</span><span>Schaden</span><span>${d.damage || '–'}</span>
+          <span>Reichweite</span><span>${d.range}</span><span>Tempo</span><span>${d.speed}</span></div>
+          <div class="good">Stark: ${inf.strong}</div><div class="bad">Schwach: ${inf.weak}</div>`;
+        tip.style.display = 'block';
+        const r = c.getBoundingClientRect();
+        tip.style.left = `${Math.min(innerWidth - 270, Math.max(8, r.left + r.width / 2 - 125))}px`;
+        tip.style.top = `${r.top - tip.offsetHeight - 12}px`;
+      };
+      c.onmouseleave = () => { tip.style.display = 'none'; };
+      shop.appendChild(c); this.cardEls.set(t, c);
+    });
+
+    const orders = $('#orders', this.hud);
+    orders.innerHTML = `
+      <button class="ob" data-a="attack"><span class="ic">⚔️</span>Angriff<span class="key" style="position:static;display:inline-block;margin-left:4px">A</span></button>
+      <button class="ob" data-a="hold"><span class="ic">🛡️</span>Halten<span class="key" style="position:static;display:inline-block;margin-left:4px">H</span></button>
+      <button class="ob" data-a="retreat"><span class="ic">🏃</span>Rückzug<span class="key" style="position:static;display:inline-block;margin-left:4px">X</span></button>
+      <div class="sep"></div>
+      ${(['line', 'wedge', 'block'] as Formation[]).map((f, i) => `<button class="ob" data-f="${f}"><span class="ic">${['▬', '▲', '▦'][i]}</span>${FORM[f]}<span class="key" style="position:static;display:inline-block;margin-left:4px">${i + 1}</span></button>`).join('')}
+      <div class="sep"></div>
+      <button class="ob abil" data-ab="arrowRain"><span class="ic">🏹</span>Pfeilregen<span class="key" style="position:static;display:inline-block;margin-left:4px">Q</span><div class="cd"></div><div class="cdt"></div></button>
+      <button class="ob abil" data-ab="rally"><span class="ic">📯</span>Anfeuern<span class="key" style="position:static;display:inline-block;margin-left:4px">E</span><div class="cd"></div><div class="cdt"></div></button>`;
+    orders.onclick = ev => {
+      const b = (ev.target as HTMLElement).closest('button'); if (!b) return;
+      const ids = [...controls.selected];
+      if (b.dataset.a === 'attack' && ids.length) controls.setMode({ k: 'attackMove' });
+      else if (b.dataset.a === 'hold' && ids.length) conn.cmd({ c: 'hold', ids });
+      else if (b.dataset.a === 'retreat' && ids.length) conn.cmd({ c: 'retreat', ids });
+      else if (b.dataset.f) { controls.formation = b.dataset.f as Formation; controls.onChange(); }
+      else if (b.dataset.ab) controls.setMode({ k: 'ability', id: b.dataset.ab as AbilityId });
+    };
+
+    const side = $('#side', this.hud);
+    side.innerHTML = `<button class="btn green ready" id="ready">Bereit!</button>`;
+    $<HTMLButtonElement>('#ready', side).onclick = () => {
+      const me = conn.latest()?.players[conn.you];
+      if (me) conn.cmd({ c: 'ready', ready: !me.ready });
+    };
+    controls.onChange = () => this.refreshStatic(controls);
+    this.refreshStatic(controls);
+  }
+
+  private refreshStatic(c: Controls) {
+    if (!this.hud) return;
+    for (const [t, el_] of this.cardEls) el_.classList.toggle('active', c.mode.k === 'buy' && c.mode.troop === t);
+    this.hud.querySelectorAll<HTMLElement>('[data-f]').forEach(b => b.classList.toggle('active', b.dataset.f === c.formation));
+    this.hud.querySelectorAll<HTMLElement>('[data-ab]').forEach(b => b.classList.toggle('active', c.mode.k === 'ability' && c.mode.id === b.dataset.ab));
+    this.hud.querySelector('[data-a="attack"]')?.classList.toggle('active', c.mode.k === 'attackMove');
+    const hint = $('#hint', this.hud);
+    const text = c.mode.k === 'buy' ? `${TROOPS[c.mode.troop].name} platzieren: klicke auf die helle Fläche (Esc = fertig)`
+      : c.mode.k === 'attackMove' ? 'Klicke auf das Ziel für den Angriffsmarsch'
+        : c.mode.k === 'ability' ? 'Klicke auf die Stelle für die Fähigkeit' : '';
+    hint.style.display = text ? 'block' : 'none'; hint.textContent = text;
+    // selection panel
+    const sel = $('#sel', this.hud);
+    const s = c.selected.size;
+    sel.style.display = s ? 'block' : 'none';
+    if (s) {
+      const snap = (this as unknown as { snap?: Snapshot }).snap;
+      const us = snap?.units.filter(u => c.selected.has(u.id)) ?? [];
+      const counts = new Map<string, number>();
+      us.forEach(u => counts.set(u.type, (counts.get(u.type) ?? 0) + 1));
+      sel.innerHTML = `<b>${s} ausgewählt</b><div>${[...counts].map(([t, n]) => `${n}× ${UNIT_DEFS[t as keyof typeof UNIT_DEFS].name}`).join(', ')}</div>
+        <div class="sub">Rechtsklick: ${snap?.phase === 'prep' ? 'platzieren' : 'bewegen / angreifen'}</div>`;
+    }
+  }
+
+  toast(msg: string, err = false) {
+    const t = $('#toast', this.hud!);
+    t.textContent = msg; t.classList.toggle('err', err); t.classList.add('show');
+    clearTimeout(this.toastT); this.toastT = window.setTimeout(() => t.classList.remove('show'), 2200);
+  }
+
+  banner(title: string, sub = '') {
+    const b = $('#banner', this.hud!);
+    $('h2', b).textContent = title; $('p', b).textContent = sub;
+    b.classList.remove('show'); void b.offsetWidth; b.classList.add('show');
+  }
+
+  /* ---------- per-snapshot update ---------- */
+  update(s: Snapshot, conn: Connection, controls: Controls) {
+    if (!this.hud) return;
+    (this as unknown as { snap?: Snapshot }).snap = s;
+    const you = conn.you, me = s.players[you];
+    const castle = s.units.find(u => u.type === 'castle');
+    if (castle) {
+      $('#castleHp', this.hud).style.width = `${Math.max(0, (castle.hp / castle.maxHp) * 100)}%`;
+      $('#castleTxt', this.hud).textContent = `${castle.hp}`;
+    }
+    const waveName = WAVES[Math.min(s.wave, WAVES.length - 1)].name;
+    $('#waveTxt', this.hud).textContent = `Welle ${Math.min(s.wave + 1, s.waveCount)} / ${s.waveCount}`;
+    const timer = $('#timer', this.hud), sub = $('#phaseSub', this.hud);
+    if (s.phase === 'prep') { timer.textContent = `${Math.max(0, Math.ceil(s.timer))}s`; sub.textContent = 'Aufstellphase – kauft und platziert Truppen'; }
+    else if (s.phase === 'battle') {
+      timer.textContent = ''; sub.textContent = `Kampf: ${waveName}`;
+    } else { timer.textContent = ''; sub.textContent = ''; }
+
+    $('#players', this.hud).innerHTML = ([0, 1] as PlayerId[]).map(p => {
+      const colors = ['#4a94d9', '#ee7f9b'];
+      const st = s.players[p];
+      return `<div class="pill pl"><span class="dot" style="background:${colors[p]}"></span>${p === you ? 'Du' : 'Partnerin'}
+        <span class="coin"></span>${Math.floor(st.gold)}${s.phase === 'prep' ? (st.ready ? ' <span class="ok">✔ bereit</span>' : '') : ''}</div>`;
+    }).join('');
+
+    const prep = s.phase === 'prep';
+    $('#shop', this.hud).style.display = prep ? 'flex' : 'none';
+    $('#orders', this.hud).style.display = s.phase === 'battle' ? 'flex' : 'none';
+    const side = $('#side', this.hud);
+    side.style.display = prep ? 'flex' : 'none';
+    const ready = $<HTMLButtonElement>('#ready', this.hud);
+    ready.textContent = me.ready ? 'Warte auf Partnerin…' : 'Bereit! (Leertaste)';
+    ready.classList.toggle('green', !me.ready); ready.classList.toggle('ghost', me.ready);
+    for (const [t, c] of this.cardEls) c.classList.toggle('poor', TROOPS[t].cost > me.gold);
+
+    this.hud.querySelectorAll<HTMLElement>('.abil').forEach(b => {
+      const id = b.dataset.ab as AbilityId, cd = me.abilityCd[id];
+      const max = id === 'arrowRain' ? 22 : 38;
+      ($('.cd', b)).style.height = `${Math.min(100, (cd / max) * 100)}%`;
+      ($('.cdt', b)).textContent = cd > 0 ? String(Math.ceil(cd)) : '';
+    });
+
+    // phase / wave announcements
+    if (s.phase !== this.lastPhase || s.wave !== this.lastWave) {
+      if (s.phase === 'battle') this.banner(`Welle ${s.wave + 1}`, waveName);
+      else if (s.phase === 'prep' && this.lastPhase !== '') this.banner('Geschafft!', 'Neue Truppen kaufen und aufstellen');
+      else if (s.phase === 'prep') this.banner('Aufstellphase', 'Kauft Truppen und platziert sie auf der hellen Fläche');
+      if (s.phase === 'won') this.endScreen(true);
+      if (s.phase === 'lost') this.endScreen(false);
+      this.lastPhase = s.phase; this.lastWave = s.wave;
+      this.refreshStatic(controls);
+    }
+    if (controls.selected.size) this.refreshStatic(controls);
+
+    if ((s.paused || !conn.peerConnected) && s.phase !== 'won' && s.phase !== 'lost' && !this.waiting && !this.overlay) {
+      this.overlay = el(`<div class="overlay"><div class="panel"><h2>Pause</h2><p class="hint">Deine Mitspielerin ist nicht verbunden<span class="dots"></span></p>
+        <div class="bigcode" style="font-size:44px">${conn.code}</div></div></div>`);
+      this.root.appendChild(this.overlay);
+    } else if (!s.paused && conn.peerConnected && this.overlay && this.lastPhase !== 'won' && this.lastPhase !== 'lost') {
+      this.overlay.remove(); this.overlay = undefined;
+    }
+  }
+
+  private endScreen(won: boolean) {
+    this.overlay?.remove();
+    this.overlay = el(`<div class="overlay"><div class="panel">
+      <h2>${won ? 'Sieg! 🎉' : 'Die Burg ist gefallen 😢'}</h2>
+      <p class="hint">${won ? 'Ihr habt alle Wellen gemeinsam überstanden.' : 'Beim nächsten Mal klappt es – probiert andere Truppen aus.'}</p>
+      <div class="row"><button class="btn green" id="again">Nochmal spielen</button></div></div></div>`);
+    this.root.appendChild(this.overlay);
+    $<HTMLButtonElement>('#again', this.overlay).onclick = () => { location.href = location.pathname; };
+  }
+}
