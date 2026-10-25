@@ -103,7 +103,7 @@ button { font-family: inherit; color: inherit; cursor: pointer; }
 @media (max-width: 900px) { .card { width: 78px; } .card img { width: 62px; height: 62px; } .bar { width: 120px; } }
 .preview { max-width: 520px; margin: 4px auto 0; padding: 4px 14px; background: rgba(255, 246, 228, .85); border-radius: 14px; font-size: 14px; line-height: 1.2; }
 .preview:empty { display: none; }
-.minimap { position: absolute; right: 14px; bottom: 14px; padding: 6px; border-radius: 16px; line-height: 0; pointer-events: auto; }
+.minimap { position: absolute; right: max(14px, env(safe-area-inset-right)); top: 124px; padding: 6px; border-radius: 16px; line-height: 0; pointer-events: auto; }
 .minimap canvas { border-radius: 11px; cursor: crosshair; display: block; touch-action: none; }
 .maps { display: flex; gap: 10px; justify-content: center; margin: 4px 0 18px; flex-wrap: wrap; }
 .mapcard { width: 150px; padding: 10px 10px 12px; border-radius: 18px; border: 3px solid transparent; background: #fffaf0; box-shadow: 0 4px 0 rgba(90, 70, 50, .15); text-align: center; transition: transform .1s, border-color .1s; }
@@ -161,7 +161,7 @@ canvas#c, #selbox { touch-action: none; }
   .ready { min-width: 96px; font-size: 15px; padding: 8px 10px; }
   .hintbar { bottom: 92px; font-size: 12px; padding: 3px 12px; }
   .toast { top: 54px; font-size: 13px; padding: 3px 12px; }
-  .minimap { right: max(10px, env(safe-area-inset-right)); bottom: max(6px, env(safe-area-inset-bottom)); padding: 3px; border-width: 2px; border-radius: 12px; }
+  .minimap { right: max(10px, env(safe-area-inset-right)); top: 96px; bottom: auto; padding: 3px; border-width: 2px; border-radius: 12px; }
   .minimap canvas { width: 92px; height: auto; }
   .banner { top: 30%; } .banner p { font-size: 16px; }
   .overlay .panel { padding: 14px 22px; } .overlay h2 { font-size: 28px; } .bigcode { font-size: 40px; letter-spacing: 8px; }
@@ -204,7 +204,7 @@ canvas#c, #selbox { touch-action: none; }
 .chip.gone { filter: grayscale(.8); opacity: .75; }
 .chip .fill { position: absolute; right: -6px; bottom: -6px; font: 800 11px var(--font); padding: 1px 6px; border-radius: 10px; background: linear-gradient(#9fe3a2, #58b564); color: #fff; border: 2px solid #fff; }
 .chip .fill.poor { background: #b9a88f; }
-.wallp { position: absolute; right: max(14px, env(safe-area-inset-right)); top: 150px; width: 218px; padding: 10px 12px; font-size: 14px; }
+.wallp { position: absolute; right: max(14px, env(safe-area-inset-right)); top: 292px; width: 218px; padding: 10px 12px; font-size: 14px; }
 .wallp .x { position: absolute; right: 8px; top: 6px; border: 0; background: transparent; font-size: 16px; color: var(--brown2); }
 .wallp .wh { display: flex; justify-content: space-between; align-items: baseline; padding-right: 22px; gap: 8px; }
 .wallp .stars { color: #e0a82b; letter-spacing: 1px; } .wallp .stars.bad { color: #c64545; font-weight: 800; letter-spacing: 0; }
@@ -225,7 +225,7 @@ canvas#c, #selbox { touch-action: none; }
   .chip { width: 46px; padding: 2px 2px 4px; border-width: 2px; border-radius: 11px; }
   .chip img { width: 28px; height: 28px; } .chip .n { font-size: 10.5px; } .chip .hpb { height: 4px; margin: 2px 3px 0; }
   .chip .fill { font-size: 9px; right: -5px; bottom: -5px; padding: 0 4px; border-width: 1.5px; }
-  .wallp { top: 98px; width: 188px; padding: 6px 9px; font-size: 12px; right: max(48px, calc(env(safe-area-inset-right) + 44px)); }
+  .wallp { top: 170px; width: 188px; padding: 6px 9px; font-size: 12px; right: max(10px, env(safe-area-inset-right)); }
   .wallp .wbar { height: 13px; margin: 4px 0 5px; }
   .pl .army { font-size: 11px; margin-left: 4px; }
 }
