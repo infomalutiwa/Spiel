@@ -17,9 +17,12 @@ Anspruch: hochwertig, professionell, **cozy** (warme Farben, weiches Licht, freu
 - Niederlage: Burg zerstört. Sieg: alle Wellen überlebt. Nach jeder Welle Gold für Truppen/Upgrades.
 
 ## Truppen und Konter
-- Start: Ritter (robust), Bogenschützen (Fernkampf, zerbrechlich), Speerträger (stark gegen Reiter), Reiter (schnell, stark gegen Bogenschützen).
-- Werte: Leben, Schaden, Reichweite, Tempo, Kosten. Konter-Multiplikatoren in einer Datendatei.
-- Gegner: eigene Typen (Fußsoldaten, Katapulte, Bosse mit Sonderverhalten).
+- Von Anfang an 8 Truppentypen: Ritter (robust, Nahkampf), Bogenschützen (Fernkampf, zerbrechlich), Speerträger (stark gegen Reiter), Reiter (schnell, stark gegen Bogenschützen), Armbrustschützen (hoher Schaden, langsames Nachladen, durchschlägt Rüstung), Magier (Flächenschaden), Heiler (heilt Verbündete im Umkreis), Katapult/Belagerung (Reichweite, stark gegen Gebäude).
+- Werte: Leben, Rüstung, Schaden, Reichweite, Tempo, Kosten, Moral. Konter-Multiplikatoren zwischen Schadens- und Rüstungsarten in einer Datendatei.
+- Formationen (Linie, Keil, Block), Trupp-Befehle (Angriff, Halten, Rückzug, Verfolgen) und Gelände-Boni (Hügel, Wald, Mauer).
+- Aufwertung: Truppen leveln im Kampf, Upgrade-Baum pro Typ.
+- Gegner: Fußsoldaten, Bogenschützen, Reiter, Rammböcke, Katapulte, Schamanen (buffen), Bosse mit Sonderverhalten und Phasen. Mehrere Gegnerfraktionen mit eigenem Stil.
+- Wellen mit Mischung, Richtungswechseln und Spezialereignissen (Nacht, Nebel, Sturm).
 
 ## Architektur
 - **Client** (Three.js, TypeScript, Vite): Rendering, Kamera, Auswahl/Befehle, UI.
@@ -37,8 +40,8 @@ Anspruch: hochwertig, professionell, **cozy** (warme Farben, weiches Licht, freu
 
 ## Stufenplan
 1. Grundgerüst: Karte, Burg, Kamera, zwei Spielerinnen im Raum.
-2. Ritter + Bogenschützen gegen eine einfache Welle (erste spielbare Stufe).
-3. Mehr Truppen, Konter-Logik, Gegnerarten.
+2. Erste spielbare Stufe: alle 8 Truppentypen, Konter-Logik, Formationen/Befehle und gemischte Gegnerwellen.
+3. Gegnerfraktionen, Bosse, Gelände, Wetter/Ereignisse.
 4. Mehrere Maps, Szenarien, Upgrades, Charaktere.
 5. Politur: Animationen, Sound, Effekte.
 
