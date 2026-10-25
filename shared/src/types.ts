@@ -7,7 +7,7 @@ export type TroopType =
   | 'crossbowman' | 'mage' | 'healer' | 'catapult';
 export type EnemyType =
   | 'footman' | 'raider_archer' | 'raider_rider' | 'ram'
-  | 'raider_catapult' | 'shaman' | 'brute';
+  | 'raider_catapult' | 'shaman' | 'brute' | 'ironguard';
 export type UnitType = TroopType | EnemyType | 'castle';
 export type Special = 'heal' | 'aoe' | 'buff';
 export type Formation = 'line' | 'wedge' | 'block';
@@ -59,6 +59,10 @@ export interface Unit {
   routed: number;
   /** damage bonus from nearby shamans (0.3 = +30%) */
   buff: number;
+  /** formation of the last move order (gives small combat bonuses, see combat.ts) */
+  formation: Formation;
+  /** distance run at speed since the last blow; cavalry turn it into a charge */
+  charge: number;
   facing: number;
   /** 0 idle, 1 moving, 2 attacking */
   anim: 0 | 1 | 2;

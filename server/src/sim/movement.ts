@@ -5,6 +5,7 @@ import { gridOf } from './grid';
 /** walk u toward (gx,gy) by up to speed*dt; returns true once arrived */
 /** the maps are big: everyone covers ground this much faster than their listed speed */
 export const SPEED_SCALE = 1.6;
+export const CHARGE_CAP = 40;
 
 export function moveToward(u: Unit, gx: number, gy: number, dt: number, speedMul = 1): boolean {
   const def = UNIT_DEFS[u.type];
@@ -12,6 +13,7 @@ export function moveToward(u: Unit, gx: number, gy: number, dt: number, speedMul
   const d = Math.hypot(dx, dy);
   const step = def.speed * SPEED_SCALE * speedMul * dt;
   u.anim = 1;
+  u.charge = Math.min(CHARGE_CAP, u.charge + Math.min(d, step)); // running up counts toward a cavalry charge
   if (d <= Math.max(step, 0.05)) {
     if (d > 0.001) u.facing = Math.atan2(dy, dx);
     u.x = gx; u.y = gy;

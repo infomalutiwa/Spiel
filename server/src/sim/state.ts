@@ -37,7 +37,7 @@ export function spawnUnit(
   const u: Unit = {
     id: s.nextId++, side, owner, type, x, y, hp: def.hp, maxHp: def.hp, cd: 0,
     order: { kind: 'idle', x, y }, postX: x, postY: y, targetId: null,
-    level: 1, xp: 0, morale: 100, routed: 0, buff: 0, facing: side === 'player' ? 0 : Math.PI,
+    level: 1, xp: 0, morale: 100, routed: 0, buff: 0, formation: 'block', charge: 0, facing: side === 'player' ? 0 : Math.PI,
     anim: 0, lane,
   };
   s.units.push(u);

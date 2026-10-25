@@ -9,7 +9,7 @@ import type { World } from './scene';
 /** world scale of each baked character (the packs ship at roughly human size) */
 const SCALE: Partial<Record<UnitType, number>> = {
   knight: 1.45, spearman: 1.45, archer: 1.4, crossbowman: 1.4, mage: 1.4, healer: 1.4, cavalry: 1.5,
-  footman: 1.4, raider_archer: 1.4, shaman: 1.45, brute: 2.1, raider_rider: 1.5,
+  footman: 1.4, raider_archer: 1.4, shaman: 1.45, brute: 2.1, raider_rider: 1.5, ironguard: 1.5,
 };
 /** kinds that stay as cloned scene objects (few of them, unanimated models) */
 const OBJECT_MODELS: Partial<Record<UnitType, { file: string; size: number }>> = {

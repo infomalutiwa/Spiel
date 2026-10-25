@@ -15,12 +15,12 @@ const REASONS: Record<string, string> = {
 export const reasonText = (r: string) => REASONS[r] ?? r;
 
 const INFO: Record<TroopType, { role: string; strong: string; weak: string }> = {
-  knight: { role: 'Robust im Nahkampf – hält die Linie.', strong: 'Fußvolk, Bogen', weak: 'Magie, Armbrust' },
-  archer: { role: 'Fernkampf, stark gegen leichte Ziele.', strong: 'Leichte Ziele', weak: 'Schwere Rüstung, Reiter' },
-  spearman: { role: 'Doppelt stark gegen Reiter.', strong: 'Reiter', weak: 'Schwere Rüstung' },
-  cavalry: { role: 'Schnell – jagt Bogenschützen.', strong: 'Bogen, Leichte', weak: 'Speere' },
-  crossbowman: { role: 'Langsam, aber durchschlägt Rüstung.', strong: 'Schwere Rüstung', weak: 'Belagerung, Nahkampf' },
-  mage: { role: 'Flächenschaden, bricht dicke Rüstung.', strong: 'Gruppen, Schwere', weak: 'Reiter' },
+  knight: { role: 'Robust im Nahkampf – hält die Linie. Im Block (3) nimmt er 15 % weniger Schaden.', strong: 'Fußvolk, Bogen', weak: 'Magie, Armbrust' },
+  archer: { role: 'Weite Reichweite; weicht beim Nachladen zurück, wenn Nahkämpfer nahen. In der Linie (1) +15 % Schaden.', strong: 'Leichte Ziele, Magier, Heiler', weak: 'Schwere Rüstung, Reiter' },
+  spearman: { role: 'Hält er die Stellung (H), prallen Reiter fast wirkungslos ab – Speerwall.', strong: 'Reiter (doppelt)', weak: 'Schwere Rüstung' },
+  cavalry: { role: 'Sturmangriff aus dem Anlauf: über 2× Schaden, im Keil (2) noch mehr. Jagt Bogenschützen, Magier und Heiler.', strong: 'Fernkämpfer, Leichte', weak: 'Speerwall, Eisenwachen' },
+  crossbowman: { role: 'Langsam, aber durchschlägt Rüstung – der Konter gegen Eisenwachen.', strong: 'Schwere Rüstung', weak: 'Belagerung, Nahkampf' },
+  mage: { role: 'Flächenschaden, bricht dicke Rüstung. Braucht Schutz.', strong: 'Gruppen, Schwere', weak: 'Reiter' },
   healer: { role: 'Heilt Verbündete in der Nähe.', strong: 'Hält die Armee am Leben', weak: 'Alles – gut beschützen' },
   catapult: { role: 'Riesige Reichweite, zerstört Belagerungsgerät.', strong: 'Rammen, Katapulte', weak: 'Schnelle Truppen' },
 };
@@ -165,7 +165,7 @@ export class Ui {
       <button class="ob" data-a="hold"><span class="ic">🛡️</span>Halten<span class="key" style="position:static;display:inline-block;margin-left:4px">H</span></button>
       <button class="ob" data-a="retreat"><span class="ic">🏃</span>Rückzug<span class="key" style="position:static;display:inline-block;margin-left:4px">X</span></button>
       <div class="sep"></div>
-      ${(['line', 'wedge', 'block'] as Formation[]).map((f, i) => `<button class="ob" data-f="${f}"><span class="ic">${['▬', '▲', '▦'][i]}</span>${FORM[f]}<span class="key" style="position:static;display:inline-block;margin-left:4px">${i + 1}</span></button>`).join('')}
+      ${(['line', 'wedge', 'block'] as Formation[]).map((f, i) => `<button class="ob" data-f="${f}" title="${({ line: 'Feuerlinie: Fernkämpfer +15 % Schaden', wedge: 'Sturmkeil: Reiter-Angriff noch stärker', block: 'Schildwall: Nahkämpfer −15 % Schaden' } as Record<string, string>)[f]}"><span class="ic">${['▬', '▲', '▦'][i]}</span>${FORM[f]}<span class="key" style="position:static;display:inline-block;margin-left:4px">${i + 1}</span></button>`).join('')}
       <div class="sep"></div>
       <button class="ob abil" data-ab="arrowRain"><span class="ic">🏹</span>Pfeilregen<span class="key" style="position:static;display:inline-block;margin-left:4px">Q</span><div class="cd"></div><div class="cdt"></div></button>
       <button class="ob abil" data-ab="rally"><span class="ic">📯</span>Anfeuern<span class="key" style="position:static;display:inline-block;margin-left:4px">E</span><div class="cd"></div><div class="cdt"></div></button>`;

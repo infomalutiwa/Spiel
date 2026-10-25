@@ -12,6 +12,7 @@ export const ENEMIES: Record<EnemyType, UnitDef> = {
   raider_rider: {
     name: 'Plünderer', hp: 140, armor: 'mounted', armorValue: 15, damage: 18, damageKind: 'charge',
     range: 1.8, speed: 6.6, cost: 20, morale: 80, cooldown: 1.3, radius: 1.1,
+    prefers: ['light'],
   },
   ram: {
     name: 'Rammbock', hp: 320, armor: 'siege', armorValue: 30, damage: 70, damageKind: 'siege',
@@ -27,6 +28,10 @@ export const ENEMIES: Record<EnemyType, UnitDef> = {
     name: 'Schamane', hp: 90, armor: 'light', armorValue: 2, damage: 0, damageKind: 'magic',
     range: 9, speed: 3.0, cost: 25, morale: 70, cooldown: 1.5, radius: 0.75,
     special: 'buff', areaRadius: 8, power: 0.3,
+  },
+  ironguard: {
+    name: 'Eisenwache', hp: 260, armor: 'heavy', armorValue: 55, damage: 18, damageKind: 'slash',
+    range: 1.7, speed: 2.8, cost: 22, morale: 100, cooldown: 1.2, radius: 0.95,
   },
   brute: {
     name: 'Grobian', hp: 700, armor: 'heavy', armorValue: 35, damage: 40, damageKind: 'slash',

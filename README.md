@@ -44,6 +44,14 @@ Mit `ALLOWED_ORIGINS` (vom Skript gesetzt) akzeptiert der Server nur Verbindunge
 - **Kampf**: Truppen auswählen (Klick, Box ziehen, Doppelklick = alle gleichen), mit Rechtsklick bewegen oder angreifen, Formation wählen.
 - Nach jeder Welle gibt's Gold, die Truppen werden geheilt. Fällt die Burg, ist das Spiel verloren; überlebt ihr alle 12 Wellen, habt ihr gewonnen.
 
+### Rollen und Mechaniken
+
+- **Reiter:** laufen sich warm – ein Sturmangriff aus dem Anlauf (≈ 1 s Laufen) richtet mehr als doppelt so viel Schaden an, im **Keil** (`2`) noch mehr. Sie jagen bevorzugt Bogenschützen, Magier und Heiler. Gegner-Plünderer tun dasselbe mit euren Fernkämpfern!
+- **Speerträger:** In **Halten** (`H`) bilden sie einen Speerwall, der Reiter fast ganz abprallen lässt.
+- **Bogenschützen:** haben die größte Reichweite, weichen beim Nachladen vor Nahkämpfern zurück und schießen in der **Linie** (`1`) 15 % härter. Schwere Rüstung (Eisenwachen, Brute) macht ihnen zu schaffen – dafür sind **Armbrust** und **Magier** da.
+- **Block** (`3`): Nahkämpfer nehmen 15 % weniger Schaden (Schildwall).
+- Gegner werden mit jeder Welle zahlreicher und ab Welle 4 und 7 erfahrener (Sterne über dem Kopf: mehr Leben und Schaden); wer zu lange herumsteht, bekommt Besuch von Eisenwachen, Rammen und Schamanen.
+
 | Taste | Aktion |
 |---|---|
 | Klick / Box ziehen / Doppelklick | auswählen |

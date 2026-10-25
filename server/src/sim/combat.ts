@@ -5,7 +5,11 @@ import { castleOf, edgeDist, getUnit, pushEvent } from './state';
 import { castlePos, moveToward } from './movement';
 import { gridOf } from './grid';
 
-const aggroOf = (u: Unit) => Math.max(UNIT_DEFS[u.type].range + 3, 9);
+/** how far a unit looks for trouble; fast riders scan wide so they get a run-up for their charge */
+const aggroOf = (u: Unit) => (UNIT_DEFS[u.type].speed >= 6 ? 26 : Math.max(UNIT_DEFS[u.type].range + 3, 9));
+
+export const CHARGE_MIN = 14;
+const chargeReady = (u: Unit) => UNIT_DEFS[u.type].damageKind === 'charge' && u.charge >= CHARGE_MIN;
 
 /** damage `attacker` deals to `target` in one hit (counter table, armor, level, shaman buff) */
 export function resolveDamage(attacker: Unit, target: Unit): number {
@@ -13,7 +17,12 @@ export function resolveDamage(attacker: Unit, target: Unit): number {
   if (a.damage <= 0) return 0;
   const mult = DAMAGE_VS_ARMOR[a.damageKind][t.armor];
   const armor = t.armorValue * (1 - (a.armorPierce ?? 0));
-  const raw = a.damage * mult * (1 + 0.12 * (attacker.level - 1)) * (1 + attacker.buff);
+  let raw = a.damage * mult * (1 + 0.12 * (attacker.level - 1)) * (1 + attacker.buff);
+  const spearWall = a.damageKind === 'charge' && t.damageKind === 'spear' && target.order.kind === 'hold';
+  if (chargeReady(attacker) && !spearWall) raw *= attacker.formation === 'wedge' ? 2.8 : 2.2; // Sturmangriff
+  if (spearWall) raw *= 0.35;                                                                     // Speerwall stops riders
+  if (a.range >= 8 && attacker.formation === 'line') raw *= 1.15;                                 // firing line
+  if (t.range < 4 && target.formation === 'block') raw *= 0.85;                                   // shield wall
   return Math.max(1, (raw * 100) / (100 + armor));
 }
 
@@ -73,6 +82,7 @@ function attack(s: GameState, u: Unit, t: Unit): void {
   u.anim = 2;
   u.facing = Math.atan2(t.y - u.y, t.x - u.x);
   const credit: Credit = { owner: u.owner, unit: u };
+  if (chargeReady(u)) pushEvent(s, { k: 'aoe', x: t.x, y: t.y, r: 3.2, kind: 'siege' }); // dust cloud of the charge
   pushEvent(s, { k: 'shot', from: u.id, to: t.id, x: u.x, y: u.y, tx: t.x, ty: t.y, kind: def.damageKind });
   if (def.special === 'aoe' && def.areaRadius) {
     pushEvent(s, { k: 'aoe', x: t.x, y: t.y, r: def.areaRadius, kind: def.damageKind === 'siege' ? 'siege' : 'magic' });
@@ -87,6 +97,7 @@ function attack(s: GameState, u: Unit, t: Unit): void {
   } else {
     applyDamage(s, credit, t, resolveDamage(u, t));
   }
+  u.charge = 0;
 }
 
 export function stepCombat(s: GameState, dt: number): void {
@@ -120,6 +131,15 @@ export function stepCombat(s: GameState, dt: number): void {
       if (t && escort && edgeDist(u, t) < 11) { u.anim = 0; continue; }
       t = undefined;
     }
+
+    // ranged troops fall back while reloading when melee enemies get too close (stay near the post)
+    if (t && !hold && def.range >= 8 && def.special !== 'buff' && UNIT_DEFS[t.type].range < 4
+      && edgeDist(u, t) < Math.min(5, def.range * 0.3) && u.cd > 0.15 && Math.hypot(u.x - u.postX, u.y - u.postY) < 16) {
+      const dx = u.x - t.x, dy = u.y - t.y, dd = Math.hypot(dx, dy) || 1;
+      moveToward(u, u.x + (dx / dd) * 6, u.y + (dy / dd) * 6, dt, 0.9);
+      continue;
+    }
+    if (u.anim !== 1) u.charge = Math.max(0, u.charge - 10 * dt);
 
     if (t) {
       const d = edgeDist(u, t);

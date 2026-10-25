@@ -102,13 +102,14 @@ export function applyCommand(s: GameState, player: PlayerId, c: Command): Result
       if (!us || !finite(c.x, c.y)) return fail('bad_command');
       const map = MAPS[s.mapId];
       const x = Math.min(map.width - 1, Math.max(1, c.x)), y = Math.min(map.depth - 1, Math.max(1, c.y));
-      const slots = formationSlots(us, c.formation === 'line' || c.formation === 'wedge' ? c.formation : 'block', { x, y }, facingTo(us, x, y));
+      const form: Formation = c.formation === 'line' || c.formation === 'wedge' ? c.formation : 'block';
+      const slots = formationSlots(us, form, { x, y }, facingTo(us, x, y));
       const focus = c.c === 'attack' ? getUnit(s, c.targetId) : undefined;
       us.forEach((u, i) => {
         const p = { x: Math.min(map.width - 1, Math.max(1, slots[i].x)), y: Math.min(map.depth - 1, Math.max(1, slots[i].y)) };
         u.order = { kind: c.c === 'move' ? 'move' : 'attackMove', x: p.x, y: p.y,
           targetId: focus && focus.side === 'enemy' ? focus.id : undefined };
-        u.postX = p.x; u.postY = p.y; u.targetId = null;
+        u.postX = p.x; u.postY = p.y; u.targetId = null; u.formation = form;
       });
       return { ok: true };
     }

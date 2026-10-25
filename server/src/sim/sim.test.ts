@@ -125,6 +125,7 @@ describe('special troops', () => {
   it('crossbow ignores part of heavy armor', () => {
     const s = battle();
     const x = mine(s, 'crossbowman', 40, 40), brute = foe(s, 'brute', 60, 40);
+    brute.formation = 'line'; // no shield-wall bonus, so the plain armor math applies
     const withPierce = resolveDamage(x, brute);
     const noPierce = UNIT_DEFS.crossbowman.damage * 1.1 * 100 / (100 + UNIT_DEFS.brute.armorValue);
     expect(withPierce).toBeGreaterThan(noPierce);
@@ -215,7 +216,7 @@ describe('waves and phases', () => {
     applyCommand(s, 1, { c: 'ready', ready: true });
     tick(s);
     expect(s.phase).toBe('battle');
-    const total = WAVES[0].groups.reduce((a, g) => a + Math.max(1, Math.round(g.count * MAPS.meadow.waveScale)), 0);
+    const total = WAVES[0].groups.reduce((a, g) => a + Math.max(1, Math.round(g.count * MAPS.meadow.waveScale * 0.8)), 0);
     expect(s.spawnQueue.length).toBe(total);
     run(s, 16);
     expect(s.spawnQueue.length).toBe(0);
@@ -272,5 +273,69 @@ describe('waves and phases', () => {
     expect(() => { for (let i = 0; i < 3000; i++) tick(s); }).not.toThrow();
     for (const u of s.units) expect(Number.isFinite(u.x + u.y + u.hp)).toBe(true);
     expect(MAPS.meadow.width).toBeGreaterThan(0);
+  });
+});
+
+describe('role mechanics', () => {
+  it('cavalry that has built up a run-up hits far harder (Sturmangriff), wedge more so', () => {
+    const s = battle();
+    const archer = foe(s, 'raider_archer', 80, 40);
+    const horse = mine(s, 'cavalry', 70, 40);
+    const base = resolveDamage(horse, archer);
+    horse.charge = 20;
+    const charged = resolveDamage(horse, archer);
+    expect(charged).toBeGreaterThan(base * 2);
+    horse.formation = 'wedge';
+    expect(resolveDamage(horse, archer)).toBeGreaterThan(charged * 1.2);
+    horse.charge = 5; // too little run-up
+    expect(resolveDamage(horse, archer)).toBeLessThan(charged);
+  });
+  it('a holding spear wall blunts a charge; moving spearmen do not', () => {
+    const s = battle();
+    const horse = foe(s, 'raider_rider', 80, 40);
+    horse.charge = 30;
+    const wall = mine(s, 'spearman', 75, 40), loose = mine(s, 'spearman', 75, 44);
+    wall.order = { kind: 'hold', x: 75, y: 40 };
+    expect(resolveDamage(horse, wall)).toBeLessThan(resolveDamage(horse, loose) * 0.4);
+  });
+  it('a charge is spent by the blow and builds up again only by running', () => {
+    const s = battle();
+    const horse = mine(s, 'cavalry', 60, 40), victim = foe(s, 'footman', 82, 40);
+    victim.order = { kind: 'hold', x: 82, y: 40 };
+    run(s, 4);
+    expect(victim.hp).toBeLessThan(victim.maxHp);
+    expect(horse.charge).toBeLessThan(14);
+  });
+  it('formations matter: firing line for ranged damage, block for melee defence', () => {
+    const s = battle();
+    const archer = mine(s, 'archer', 50, 40), knight = mine(s, 'knight', 50, 44), dummy = foe(s, 'ironguard', 60, 40);
+    const plain = resolveDamage(archer, dummy);
+    archer.formation = 'line';
+    expect(resolveDamage(archer, dummy)).toBeCloseTo(plain * 1.15, 5);
+    const foeKnight = foe(s, 'footman', 55, 44);
+    knight.formation = 'wedge';
+    const open = resolveDamage(foeKnight, knight);
+    knight.formation = 'block';
+    expect(resolveDamage(foeKnight, knight)).toBeCloseTo(open * 0.85, 5);
+  });
+  it('archers step back while reloading when a melee enemy closes in, but stay near their post', () => {
+    const s = battle();
+    const archer = mine(s, 'archer', 60, 40), grunt = foe(s, 'footman', 62.5, 40);
+    grunt.order = { kind: 'hold', x: 62.5, y: 40 };
+    archer.cd = 1;
+    const x0 = archer.x;
+    run(s, 0.5);
+    expect(archer.x).toBeLessThan(x0 - 1);
+    run(s, 10);
+    expect(Math.hypot(archer.x - archer.postX, archer.y - archer.postY)).toBeLessThan(18);
+  });
+  it('riders hunt soft targets: cavalry picks an archer over a nearer knight', () => {
+    const s = battle();
+    const horse = mine(s, 'cavalry', 50, 40);
+    const knight = foe(s, 'ironguard', 56, 40), archer = foe(s, 'raider_archer', 68, 40);
+    for (const e of [knight, archer]) e.order = { kind: 'hold', x: e.x, y: e.y };
+    run(s, 0.1);
+    expect(horse.targetId).toBe(archer.id);
+    void knight;
   });
 });
