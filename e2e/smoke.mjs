@@ -34,9 +34,14 @@ await b.goto(`${BASE}/?room=${code}`); await jsClick(b, '#join');
 check(await until(a, s => s && !s.paused), 'both players connected, game running');
 
 const buy = (p, list) => p.evaluate(l => l.forEach(([t, x, y]) => window.__bw.conn.cmd({ c: 'buy', troop: t, x, y })), list);
-await buy(a, [['knight', 60, 60], ['archer', 56, 66], ['spearman', 60, 72]]);
-await buy(b, [['cavalry', 64, 80], ['healer', 54, 70], ['archer', 56, 62]]);
-check(await until(a, s => s.units.filter(u => u.owner !== null && u.type !== 'castle').length === 6), 'six troops bought and placed');
+// troops come as squads: archers go onto the wall crown, knights stand behind the gate
+const gy = await a.evaluate(() => window.__bw.world.map.barriers[0].gateY), bx = await a.evaluate(() => window.__bw.world.map.barriers[0].x);
+await buy(a, [['archer', bx, gy - 18], ['knight', bx - 8, gy - 4]]);
+await buy(b, [['crossbowman', bx, gy + 18], ['healer', bx - 16, gy + 8]]);
+check(await until(a, s => s.units.filter(u => u.owner !== null && u.squad > 0).length === 10 + 6 + 6 + 3), 'four squads bought and placed');
+check(await until(a, s => s.units.filter(u => u.type === 'archer').every(u => Math.abs(u.x - bx) < 0.01)), 'archers stand on the wall line');
+await a.waitForSelector('.chip');
+check((await a.$$('.chip')).length === 2, 'squad chips show up');
 
 // third client is turned away
 const c = await open(); await c.goto(`${BASE}/?room=${code}`); await jsClick(c, '#join');
