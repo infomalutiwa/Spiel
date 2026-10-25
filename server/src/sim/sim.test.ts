@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { UNIT_DEFS, WAVES, MAPS, START_GOLD, type Command } from '@burgwacht/shared';
+import { UNIT_DEFS, WAVES, MAPS, START_GOLD, SQUAD_SIZE, squadCost, type Command } from '@burgwacht/shared';
 import { createGame, applyCommand, resolveDamage, castAbility, tick, stepMovement, separate, getUnit, SPEED_SCALE } from './index';
 import { battle, mine, foe, run } from './helpers';
 
@@ -145,22 +145,22 @@ describe('special troops', () => {
 });
 
 describe('orders', () => {
-  it('buy checks gold, zone and phase; spends gold', () => {
+  it('buy checks gold, zone and phase; a purchase is a whole squad', () => {
     const s = createGame('meadow', 1);
-    expect(applyCommand(s, 0, { c: 'buy', troop: 'knight', x: 60, y: 60 })).toEqual({ ok: true });
-    expect(s.players[0].gold).toBe(START_GOLD - UNIT_DEFS.knight.cost);
-    const g = s.players[0].gold, n = s.units.length;
-    expect(applyCommand(s, 0, { c: 'buy', troop: 'catapult', x: 60, y: 60 }).ok).toBe(g >= 180);
-    s.units.length = n; s.players[0].gold = 10;
-    const r = applyCommand(s, 0, { c: 'buy', troop: 'knight', x: 60, y: 60 });
-    expect(r).toEqual({ ok: false, reason: 'not_enough_gold' });
+    expect(applyCommand(s, 0, { c: 'buy', troop: 'knight', x: 140, y: 60 })).toEqual({ ok: true });
+    expect(s.players[0].gold).toBe(START_GOLD - squadCost('knight'));
+    const knights = s.units.filter(u => u.type === 'knight');
+    expect(knights.length).toBe(SQUAD_SIZE.knight);
+    expect(new Set(knights.map(u => u.squad)).size).toBe(1);
+    s.players[0].gold = 10;
+    expect(applyCommand(s, 0, { c: 'buy', troop: 'knight', x: 140, y: 60 })).toEqual({ ok: false, reason: 'not_enough_gold' });
     expect(s.players[0].gold).toBe(10);
-    s.players[0].gold = 500;
+    s.players[0].gold = 5000;
     expect(applyCommand(s, 0, { c: 'buy', troop: 'knight', x: 5, y: 5 })).toEqual({ ok: false, reason: 'outside_zone' });
-    expect(applyCommand(s, 0, { c: 'buy', troop: 'nope' as never, x: 60, y: 60 }).ok).toBe(false);
+    expect(applyCommand(s, 0, { c: 'buy', troop: 'nope' as never, x: 140, y: 60 }).ok).toBe(false);
     expect(applyCommand(s, 0, { c: 'buy', troop: 'knight', x: NaN, y: 60 }).ok).toBe(false);
     s.phase = 'battle';
-    expect(applyCommand(s, 0, { c: 'buy', troop: 'knight', x: 60, y: 60 })).toEqual({ ok: false, reason: 'not_prep' });
+    expect(applyCommand(s, 0, { c: 'buy', troop: 'knight', x: 140, y: 60 })).toEqual({ ok: false, reason: 'not_prep' });
   });
   it('rejects orders for units the player does not own, changing nothing', () => {
     const s = battle();
@@ -199,11 +199,11 @@ describe('orders', () => {
   });
   it('placement only in prep and inside the zone', () => {
     const s = createGame('meadow', 1);
-    applyCommand(s, 0, { c: 'buy', troop: 'knight', x: 60, y: 60 });
+    applyCommand(s, 0, { c: 'buy', troop: 'knight', x: 140, y: 60 });
     const u = s.units.find(x => x.type === 'knight')!;
-    expect(applyCommand(s, 0, { c: 'place', ids: [u.id], x: 70, y: 60 }).ok).toBe(true);
-    expect(u.x).toBeGreaterThan(60);
-    expect(applyCommand(s, 0, { c: 'place', ids: [u.id], x: 200, y: 30 })).toEqual({ ok: false, reason: 'outside_zone' });
+    expect(applyCommand(s, 0, { c: 'place', ids: [u.id], x: 150, y: 60 }).ok).toBe(true);
+    expect(u.x).toBeGreaterThan(140);
+    expect(applyCommand(s, 0, { c: 'place', ids: [u.id], x: 230, y: 30 })).toEqual({ ok: false, reason: 'outside_zone' });
   });
 });
 

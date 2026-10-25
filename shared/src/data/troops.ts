@@ -34,7 +34,7 @@ export const TROOPS: Record<TroopType, UnitDef> = {
   },
   catapult: {
     name: 'Katapult', hp: 150, armor: 'siege', armorValue: 12, damage: 60, damageKind: 'siege',
-    range: 22, speed: 1.8, cost: 180, morale: 100, cooldown: 4.5, radius: 1.5,
+    range: 30, speed: 1.8, cost: 180, morale: 100, cooldown: 4.5, radius: 1.5,
     prefers: ['siege', 'structure'], special: 'aoe', areaRadius: 2.6,
   },
 };

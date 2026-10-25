@@ -1,4 +1,4 @@
-import { MAPS, UNIT_DEFS, type GameState, type Unit } from '@burgwacht/shared';
+import { MAPS, UNIT_DEFS, isFixedType, isStructureType, type GameState, type Unit } from '@burgwacht/shared';
 import { castleOf, rand } from './state';
 import { gridOf } from './grid';
 
@@ -28,7 +28,7 @@ export function moveToward(u: Unit, gx: number, gy: number, dt: number, speedMul
 /** executes explicit move / retreat orders; combat.ts handles the rest */
 export function stepMovement(s: GameState, dt: number): void {
   for (const u of s.units) {
-    if (u.hp <= 0 || u.type === 'castle') continue;
+    if (u.hp <= 0 || isFixedType(u.type)) continue;
     if (u.routed > 0) continue; // handled by morale logic
     if (u.order.kind === 'move' || u.order.kind === 'retreat') {
       u.anim = 0;
@@ -50,8 +50,9 @@ export function separate(s: GameState): void {
   for (const a of s.units) {
     if (a.hp <= 0) continue;
     const ra = UNIT_DEFS[a.type].radius;
+    if (isStructureType(a.type)) continue; // walls are solid for the enemy only, see below
     grid.near(a.x, a.y, ra + 3.5, b => {
-      if (b.id <= a.id || b.hp <= 0) return; // each pair once, in id order
+      if (b.id <= a.id || b.hp <= 0 || isStructureType(b.type)) return; // each pair once, in id order
       const min = (ra + UNIT_DEFS[b.type].radius) * 0.75;
       let dx = b.x - a.x, dy = b.y - a.y;
       let d = Math.hypot(dx, dy);
@@ -62,10 +63,24 @@ export function separate(s: GameState): void {
       }
       const push = Math.min(min - d, 0.5);
       const nx = dx / d, ny = dy / d;
-      const aFixed = a.type === 'castle', bFixed = b.type === 'castle';
+      const aFixed = isFixedType(a.type), bFixed = isFixedType(b.type);
       const wa = aFixed ? 0 : bFixed ? 1 : 0.5, wb = bFixed ? 0 : aFixed ? 1 : 0.5;
       a.x -= nx * push * wa; a.y -= ny * push * wa;
       b.x += nx * push * wb; b.y += ny * push * wb;
+    });
+  }
+  // the enemy cannot walk through standing walls, gates and towers (defenders stand on / pass them)
+  for (const e of s.units) {
+    if (e.hp <= 0 || e.side !== 'enemy') continue;
+    const re = UNIT_DEFS[e.type].radius * 0.8;
+    grid.near(e.x, e.y, re + 8, st => {
+      if (st.hp <= 0 || !isStructureType(st.type)) return;
+      const min = UNIT_DEFS[st.type].radius + re;
+      let dx = e.x - st.x, dy = e.y - st.y;
+      const d = Math.hypot(dx, dy);
+      if (d >= min) return;
+      if (d < 1e-4) { dx = 1; dy = 0; } else { dx /= d; dy /= d; }
+      e.x = st.x + dx * min; e.y = st.y + dy * min;
     });
   }
   for (const u of s.units) {

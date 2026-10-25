@@ -1,5 +1,5 @@
 import {
-  MAPS, UNIT_DEFS, type AbilityId, type GameState, type PlayerId, type Unit,
+  MAPS, UNIT_DEFS, isFixedType, type AbilityId, type GameState, type PlayerId, type Unit,
 } from '@burgwacht/shared';
 import { applyDamage } from './combat';
 import { moveToward } from './movement';
@@ -29,7 +29,7 @@ export function castAbility(s: GameState, player: PlayerId, id: AbilityId, x: nu
   } else {
     pushEvent(s, { k: 'aoe', x, y, r: 12, kind: 'rally' });
     const allies: Unit[] = [];
-    gridOf(s).near(x, y, 12 + 1, u => { if (u.hp > 0 && u.owner === player && u.type !== 'castle' && dist(u, { x, y }) <= 12) allies.push(u); });
+    gridOf(s).near(x, y, 12 + 1, u => { if (u.hp > 0 && u.owner === player && !isFixedType(u.type) && dist(u, { x, y }) <= 12) allies.push(u); });
     allies.sort((a, b) => a.id - b.id);
     for (const u of allies) {
       const heal = u.maxHp * 0.25;
@@ -44,7 +44,7 @@ export function castAbility(s: GameState, player: PlayerId, id: AbilityId, x: nu
 const woundedFriends = (s: GameState, u: Unit, within: number) => {
   const out: Unit[] = [];
   gridOf(s).near(u.x, u.y, within, o => {
-    if (o.hp > 0 && o.hp < o.maxHp && o.side === u.side && o.type !== 'castle' && o !== u && dist(u, o) <= within) out.push(o);
+    if (o.hp > 0 && o.hp < o.maxHp && o.side === u.side && !isFixedType(o.type) && o !== u && dist(u, o) <= within) out.push(o);
   });
   return out.sort((a, b) => a.id - b.id);
 };
@@ -64,7 +64,7 @@ export function stepAbilities(s: GameState, dt: number): void {
   }
 
   for (const u of s.units) {
-    if (u.hp <= 0 || u.type === 'castle') continue;
+    if (u.hp <= 0 || isFixedType(u.type)) continue;
     const def = UNIT_DEFS[u.type];
 
     // morale: recover slowly, rout when it breaks

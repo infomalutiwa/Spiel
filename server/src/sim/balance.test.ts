@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import type { TroopType } from '@burgwacht/shared';
+import { type TroopType } from '@burgwacht/shared';
 import { applyCommand, createGame, tick } from './index';
 import { botBuy } from './bot';
 
-const MIX: TroopType[] = ['knight', 'archer', 'spearman', 'healer', 'archer', 'mage', 'cavalry', 'crossbowman'];
+const MIX: TroopType[] = ['archer', 'knight', 'catapult', 'spearman', 'healer', 'crossbowman', 'cavalry', 'mage'];
 
 function play(army: boolean, maxSeconds = 1500) {
   const s = createGame('meadow', 7);
@@ -23,7 +23,7 @@ describe('balance', { timeout: 90_000 }, () => {
   it('an idle army holds the early waves but not the whole game; no army falls fast', () => {
     const withArmy = play(true);
     expect(withArmy.phase).toBe('lost');
-    expect(withArmy.wave).toBeGreaterThanOrEqual(3); // survives the first waves without any micro
+    expect(withArmy.wave).toBeGreaterThanOrEqual(5); // survives the first waves without any micro
     const without = play(false);
     expect(without.phase).toBe('lost');
     expect(without.wave).toBeLessThanOrEqual(2);

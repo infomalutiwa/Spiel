@@ -8,7 +8,8 @@ export type TroopType =
 export type EnemyType =
   | 'footman' | 'raider_archer' | 'raider_rider' | 'ram'
   | 'raider_catapult' | 'shaman' | 'brute' | 'ironguard';
-export type UnitType = TroopType | EnemyType | 'castle';
+export type StructureType = 'wall' | 'gate' | 'tower';
+export type UnitType = TroopType | EnemyType | StructureType | 'castle';
 export type Special = 'heal' | 'aoe' | 'buff';
 export type Formation = 'line' | 'wedge' | 'block';
 export type AbilityId = 'arrowRain' | 'rally';
@@ -68,6 +69,14 @@ export interface Unit {
   anim: 0 | 1 | 2;
   /** lane assigned to enemies (for pathing) */
   lane: number;
+  /** player troops: id of the squad they belong to (0 = none) */
+  squad: number;
+  /** structures: index into MapDef.walls (-1 for everything else) */
+  slot: number;
+  /** ranged defenders standing on a wall: id of the structure under their feet (0 = on the ground) */
+  deck: number;
+  /** enemies: how far along the route (gate, zone, gate, zone, keep) they are */
+  step: number;
 }
 
 export type Phase = 'prep' | 'battle' | 'won' | 'lost';
@@ -88,7 +97,14 @@ export type GameEvent =
   | { k: 'death'; x: number; y: number; type: UnitType }
   | { k: 'level'; x: number; y: number }
   | { k: 'wave'; wave: number }
-  | { k: 'phase'; phase: Phase };
+  | { k: 'phase'; phase: Phase }
+  | { k: 'zone'; id: number; owner: 'player' | 'enemy' }
+  | { k: 'breach'; slot: number; type: StructureType };
+
+/** `reached`: the enemy has taken this zone at some point this wave, so the next one opens up even if defenders win it back */
+export interface ZoneState { owner: 'player' | 'enemy'; progress: number; reached: boolean }
+/** a bought group of troops that is placed and ordered together */
+export interface SquadInfo { id: number; troop: TroopType; owner: PlayerId; x: number; y: number }
 
 export interface GameState {
   mapId: string;
@@ -104,6 +120,8 @@ export interface GameState {
   players: [PlayerState, PlayerState];
   units: Unit[];
   spawnQueue: SpawnItem[];
+  zones: ZoneState[];
+  squads: SquadInfo[];
   battleTime: number;
   /** battleTime of the most recent enemy spawn */
   lastSpawn: number;
@@ -111,7 +129,12 @@ export interface GameState {
 }
 
 export type Command =
+  /** buys a whole squad (see SQUAD_SIZE) centred on (x, y) */
   | { c: 'buy'; troop: TroopType; x: number; y: number }
+  /** replaces fallen members of a squad for gold (preparation only) */
+  | { c: 'refill'; squad: number }
+  /** walls, gates and towers: upgrade a level, repair (also in battle) or rebuild a destroyed one (preparation only) */
+  | { c: 'wall'; op: 'upgrade' | 'repair' | 'rebuild'; slot: number }
   | { c: 'place'; ids: number[]; x: number; y: number }
   | { c: 'move'; ids: number[]; x: number; y: number; formation?: Formation }
   | { c: 'attack'; ids: number[]; x: number; y: number; targetId?: number; formation?: Formation }
@@ -122,16 +145,29 @@ export type Command =
 
 export type MapTheme = 'meadow' | 'forest' | 'valley';
 
+export interface Rect { x0: number; x1: number; y0: number; y1: number }
+/** one wall segment, gate or tower; walls run north–south, the enemy comes from the east */
+export interface WallDef { kind: StructureType; x: number; y: number; bar: number }
+/** the enemy needs a gate (or a breach) to pass a barrier; barrier 0 is the outermost */
+export interface Barrier { x: number; gateY: number }
+/** capture point: enemies must hold it to advance; zone 0 is the first one they reach */
+export interface ZoneDef { id: number; name: string; x: number; y: number; r: number }
+
 export interface MapDef {
   id: string;
   name: string;
   blurb: string;
   width: number;
   depth: number;
+  /** the keep (king) in the far west */
   castle: Vec2;
   /** where enemy waves enter; a wave group's `lane` indexes this list */
   spawns: Vec2[];
-  placeZone: { x0: number; x1: number; y0: number; y1: number };
+  barriers: Barrier[];
+  walls: WallDef[];
+  zones: ZoneDef[];
+  /** where the player may put troops (inside the walls, on top of them, and a bit outside the outer gate) */
+  placeZone: Rect;
   theme: MapTheme;
   decorSeed: number;
   /** multiplier on enemy counts per wave */
@@ -154,12 +190,16 @@ export type ClientMsg =
 export interface UnitSnap {
   id: number; type: UnitType; side: Side; owner: PlayerId | null;
   x: number; y: number; hp: number; maxHp: number; facing: number; anim: number; level: number;
+  /** squad id for player troops, 0 otherwise */
+  squad: number;
 }
+export interface ZoneSnap { p: number; o: 0 | 1 }
 export interface Snapshot {
   tick: number; time: number; phase: Phase; timer: number; wave: number; waveCount: number;
   players: [PlayerState, PlayerState];
   /** decoded unit list (on the wire: base64 in `u`, see codec.ts) */
   units: UnitSnap[];
+  zones: ZoneSnap[];
   events: GameEvent[];
   paused: boolean;
 }

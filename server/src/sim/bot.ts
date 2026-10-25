@@ -1,34 +1,32 @@
 import type { GameState, PlayerId, TroopType } from '@burgwacht/shared';
-import { MAPS, TROOPS } from '@burgwacht/shared';
+import { MAPS, canManWalls, squadCost } from '@burgwacht/shared';
 import { applyCommand } from './orders';
 import { castAbility } from './abilities';
 
-/** simple scripted player used by balance tests: spends all gold on a fixed mix and holds a block in front of the castle */
-export function botBuy(s: GameState, player: PlayerId, mix: TroopType[], x?: number): number {
-  const map = MAPS[s.mapId], z = map.placeZone, cy = (z.y0 + z.y1) / 2;
-  // castle in the middle of the build zone (valley): ring the castle so every approach is covered
-  const ring = map.castle.x > z.x0 && map.castle.x < z.x1 && map.castle.y > z.y0 && map.castle.y < z.y1;
-  const x0 = x ?? z.x0 + 6;
+/**
+ * Scripted player for balance tests. Spends all gold on squads in `mix` order and places them like a sensible human:
+ * marksmen on the outer wall beside the gate, melee squads in the courtyard just behind the gate, healers and
+ * catapults behind them, cavalry in reserve. The two players take the north / south side of the gate.
+ */
+export function botBuy(s: GameState, player: PlayerId, mix: TroopType[]): number {
+  const map = MAPS[s.mapId], bar = map.barriers[0], me = s.players[player];
+  const side = player === 0 ? -1 : 1;
+  const used = { wall: 0, melee: 0, back: 0, reserve: 0 };
   let bought = 0, i = 0;
-  const me = s.players[player];
-  for (let guard = 0; guard < 600; guard++) {
+  for (let guard = 0; guard < 40; guard++) {
     const t = mix[i++ % mix.length];
-    if (TROOPS[t].cost > me.gold) {
-      if (mix.every(m => TROOPS[m].cost > me.gold)) break;
+    if (squadCost(t) > me.gold) {
+      if (mix.every(m => squadCost(m) > me.gold)) break;
       continue;
     }
-    let px: number, py: number;
-    if (ring) {
-      const n = bought * 2 + player, ang = n * 2.399963, r = 22 + (Math.floor(n / 12) % 5) * 4;
-      px = map.castle.x + Math.cos(ang) * r; py = map.castle.y + Math.sin(ang) * r;
-    } else { // blocks of 8 columns; players take the north / south half of the zone
-      const col = bought % 8, row = Math.floor(bought / 8);
-      py = cy + (player === 0 ? -1 : 1) * (6 + row * 3.4);
-      px = x0 + col * 3.2 + (player === 0 ? 0 : 1.2);
-    }
-    px = Math.min(z.x1, Math.max(z.x0, px)); py = Math.min(z.y1, Math.max(z.y0, py));
-    if (applyCommand(s, player, { c: 'buy', troop: t, x: px, y: py }).ok) bought++;
-    else break;
+    let x: number, y: number;
+    if (canManWalls(t)) { x = bar.x; y = bar.gateY + side * (15 + used.wall++ * 12.5); }
+    else if (t === 'knight' || t === 'spearman') { x = bar.x - 9 - (used.melee % 2) * 3; y = bar.gateY + side * (4 + Math.floor(used.melee++ / 2) * 5.5); }
+    else if (t === 'cavalry') { x = bar.x - 24; y = bar.gateY + side * (6 + used.reserve++ * 8); }
+    else { x = bar.x - 17; y = bar.gateY + side * (7 + used.back++ * 8); } // healers, catapults
+    y = Math.min(map.depth - 8, Math.max(8, y));
+    if (applyCommand(s, player, { c: 'buy', troop: t, x, y }).ok) bought++;
+    else if (!canManWalls(t)) continue;
   }
   return bought;
 }
@@ -51,5 +49,28 @@ export function botAbilities(s: GameState): void {
       const cx = hurt.reduce((a, u) => a + u.x, 0) / hurt.length, cy = hurt.reduce((a, u) => a + u.y, 0) / hurt.length;
       castAbility(s, p, 'rally', cx, cy);
     }
+  }
+}
+
+/** preparation-phase upkeep like a careful player: refill squads, rebuild and repair, then upgrade gates and towers first */
+export function botFortify(s: GameState, step: 'troops' | 'walls'): void {
+  const map = MAPS[s.mapId];
+  for (const p of [0, 1] as PlayerId[]) {
+    if (step === 'troops') { for (const q of s.squads.filter(q => q.owner === p)) applyCommand(s, p, { c: 'refill', squad: q.id }); continue; }
+    const order = map.walls.map((w, slot) => ({ w, slot })).sort((a, b) =>
+      a.w.bar - b.w.bar || (a.w.kind === 'gate' ? 0 : a.w.kind === 'tower' ? 1 : 2) - (b.w.kind === 'gate' ? 0 : b.w.kind === 'tower' ? 1 : 2)
+      || Math.abs(a.w.y - map.barriers[a.w.bar].gateY) - Math.abs(b.w.y - map.barriers[b.w.bar].gateY));
+    for (const { slot } of order) { applyCommand(s, p, { c: 'wall', op: 'rebuild', slot }); applyCommand(s, p, { c: 'wall', op: 'repair', slot }); }
+    for (let level = 0; level < 2; level++)
+      for (const { slot } of order.filter(o => o.w.bar === 0 || o.w.kind !== 'wall')) applyCommand(s, p, { c: 'wall', op: 'upgrade', slot });
+  }
+}
+
+/** in battle: mend the gate and towers when they are about to fall (call about once a second) */
+export function botRepair(s: GameState): void {
+  const map = MAPS[s.mapId];
+  for (const u of s.units) {
+    if (u.slot < 0 || u.hp <= 0 || u.hp > u.maxHp * 0.4 || map.walls[u.slot].kind === 'wall') continue;
+    applyCommand(s, s.players[0].gold >= s.players[1].gold ? 0 : 1, { c: 'wall', op: 'repair', slot: u.slot });
   }
 }

@@ -1,5 +1,5 @@
 import {
-  CASTLE_DEF, MAPS, PREP_TIME, START_GOLD, UNIT_DEFS,
+  CASTLE_DEF, MAPS, PREP_TIME, START_GOLD, UNIT_DEFS, isStructureType,
   type GameState, type PlayerId, type PlayerState, type Side, type Unit, type UnitType,
 } from '@burgwacht/shared';
 
@@ -24,11 +24,25 @@ export function createGame(mapId: string, seed: number): GameState {
   const s: GameState = {
     mapId, tick: 0, time: 0, rng: seed >>> 0, nextId: 1, phase: 'prep', timer: PREP_TIME,
     wave: 0, players: [newPlayer(), newPlayer()], units: [], spawnQueue: [], battleTime: 0, lastSpawn: 0, events: [],
+    zones: map.zones.map(() => ({ owner: 'player' as const, progress: 0, reached: false })), squads: [],
   };
   const castle = spawnUnit(s, 'player', null, 'castle', map.castle.x, map.castle.y);
   castle.hp = castle.maxHp = CASTLE_DEF.hp;
+  map.walls.forEach((_, i) => spawnStructure(s, i));
   return s;
 }
+
+/** (re)builds the wall piece / gate / tower of map slot `slot` at level 1 */
+export function spawnStructure(s: GameState, slot: number): Unit {
+  const w = MAPS[s.mapId].walls[slot];
+  const u = spawnUnit(s, 'player', null, w.kind, w.x, w.y);
+  u.slot = slot; u.facing = 0;
+  return u;
+}
+
+export const isStructure = (u: { type: UnitType }) => isStructureType(u.type);
+export const structureOfSlot = (s: GameState, slot: number): Unit | undefined =>
+  s.units.find(u => u.slot === slot && u.hp > 0);
 
 export function spawnUnit(
   s: GameState, side: Side, owner: PlayerId | null, type: UnitType, x: number, y: number, lane = 1,
@@ -38,7 +52,7 @@ export function spawnUnit(
     id: s.nextId++, side, owner, type, x, y, hp: def.hp, maxHp: def.hp, cd: 0,
     order: { kind: 'idle', x, y }, postX: x, postY: y, targetId: null,
     level: 1, xp: 0, morale: 100, routed: 0, buff: 0, formation: 'block', charge: 0, facing: side === 'player' ? 0 : Math.PI,
-    anim: 0, lane,
+    anim: 0, lane, squad: 0, slot: -1, deck: 0, step: 0,
   };
   s.units.push(u);
   return u;

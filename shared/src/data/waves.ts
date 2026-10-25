@@ -42,8 +42,6 @@ export const WAVES: WaveDef[] = [
 ];
 
 /** gold both players receive after clearing wave index w */
-export const waveReward = (w: number) => 420 + w * 90;
-export const START_GOLD = 1100;
-/** hard cap per player so the sim and the renderer stay smooth */
-export const MAX_ARMY = 160;
+export const waveReward = (w: number) => 480 + w * 100;
+export const START_GOLD = 1500;
 export const PREP_TIME = 40;

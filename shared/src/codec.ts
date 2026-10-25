@@ -1,13 +1,14 @@
 import type { Snapshot, UnitSnap, UnitType, WireSnapshot } from './types';
 import { TROOP_ORDER } from './data/index';
 import { ENEMIES } from './data/enemies';
+import { STRUCTURE_TYPES } from './data/structures';
 
 /** stable index <-> type table for the compact wire format */
 export const UNIT_TYPE_LIST: UnitType[] = [
-  ...TROOP_ORDER, ...(Object.keys(ENEMIES) as UnitType[]), 'castle',
+  ...TROOP_ORDER, ...(Object.keys(ENEMIES) as UnitType[]), 'castle', ...STRUCTURE_TYPES,
 ];
 const TYPE_INDEX = new Map(UNIT_TYPE_LIST.map((t, i) => [t, i]));
-const REC = 15;
+const REC = 17;
 
 const toB64 = (u8: Uint8Array): string => {
   if (typeof Buffer !== 'undefined') return Buffer.from(u8.buffer, u8.byteOffset, u8.byteLength).toString('base64');
@@ -22,7 +23,7 @@ const fromB64 = (b: string): Uint8Array => {
   return out;
 };
 
-/** 15 bytes per unit instead of ~120 bytes of JSON */
+/** 17 bytes per unit instead of ~120 bytes of JSON */
 export function encodeUnits(units: UnitSnap[]): string {
   const buf = new ArrayBuffer(units.length * REC), dv = new DataView(buf);
   units.forEach((u, i) => {
@@ -37,6 +38,7 @@ export function encodeUnits(units: UnitSnap[]): string {
     dv.setUint16(o + 12, Math.min(65535, Math.max(1, Math.round(u.maxHp))));
     const f = ((u.facing % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
     dv.setUint8(o + 14, Math.round((f / (Math.PI * 2)) * 255));
+    dv.setUint16(o + 15, u.squad & 0xffff);
   });
   return toB64(new Uint8Array(buf));
 }
@@ -52,7 +54,7 @@ export function decodeUnits(b64: string): UnitSnap[] {
       anim: (fl >> 3) & 3, level: ((fl >> 5) & 3) + 1,
       x: dv.getUint16(o + 6) / 100, y: dv.getUint16(o + 8) / 100,
       hp: dv.getUint16(o + 10), maxHp: dv.getUint16(o + 12),
-      facing: (dv.getUint8(o + 14) / 255) * Math.PI * 2,
+      facing: (dv.getUint8(o + 14) / 255) * Math.PI * 2, squad: dv.getUint16(o + 15),
     });
   }
   return out;

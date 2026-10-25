@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { START_GOLD, type ServerMsg } from '@burgwacht/shared';
+import { MAPS, START_GOLD, type ServerMsg } from '@burgwacht/shared';
 import { Room, type Socket } from './room';
 
 const fake = () => {
@@ -75,7 +75,7 @@ describe('Room', () => {
     r.join(fake()); r.join(fake());
     const s = r.snapshot();
     expect(Object.keys(s.units[0]).sort()).toEqual(
-      ['anim', 'facing', 'hp', 'id', 'level', 'maxHp', 'owner', 'side', 'type', 'x', 'y']);
+      ['anim', 'facing', 'hp', 'id', 'level', 'maxHp', 'owner', 'side', 'squad', 'type', 'x', 'y']);
     expect(r.state.events.length).toBe(0);
   });
 });
@@ -97,7 +97,7 @@ describe('Room hardening', () => {
     for (const troop of ['constructor', 'toString', '__proto__', 'hasOwnProperty'])
       r.handle(0, JSON.stringify({ t: 'cmd', cmd: { c: 'buy', troop, x: 60, y: 60 } }));
     expect(r.state.players[0].gold).toBe(START_GOLD);
-    expect(r.state.units.length).toBe(1);
+    expect(r.state.units.length).toBe(1 + MAPS.meadow.walls.length); // only the keep and the walls
   });
   it('finished games stop their timer and registries cap the number of rooms', async () => {
     const { RoomRegistry, MAX_ROOMS } = await import('./room');

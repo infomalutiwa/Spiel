@@ -99,8 +99,9 @@ export class Room {
       units: s.units.map(u => ({
         id: u.id, type: u.type, side: u.side, owner: u.owner, x: +u.x.toFixed(2), y: +u.y.toFixed(2),
         hp: Math.max(0, Math.round(u.hp)), maxHp: Math.round(u.maxHp), facing: +u.facing.toFixed(2),
-        anim: u.anim, level: u.level,
+        anim: u.anim, level: u.level, squad: u.squad,
       })),
+      zones: s.zones.map(z => ({ p: +z.progress.toFixed(3), o: z.owner === 'enemy' ? 1 as const : 0 as const })),
       events: s.events,
       paused: this.paused,
     };

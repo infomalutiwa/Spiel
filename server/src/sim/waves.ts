@@ -1,6 +1,7 @@
 import {
   ENEMIES, MAPS, PREP_TIME, WAVES, waveReward, type GameState, type Phase,
 } from '@burgwacht/shared';
+import { isFixedType } from '@burgwacht/shared';
 import { castleOf, pushEvent, rand, spawnUnit } from './state';
 
 function setPhase(s: GameState, phase: Phase) {
@@ -30,8 +31,9 @@ function startBattle(s: GameState) {
 function endBattle(s: GameState) {
   const reward = waveReward(s.wave);
   for (const p of s.players) p.gold += reward;
-  for (const u of s.units) { // a night's rest between waves
-    if (u.type === 'castle') continue;
+  s.zones.forEach(z => { z.owner = 'player'; z.progress = 0; z.reached = false; });
+  for (const u of s.units) { // a night's rest between waves; buildings mend a third of the damage on their own
+    if (isFixedType(u.type)) { if (u.type !== 'castle') u.hp = Math.min(u.maxHp, u.hp + (u.maxHp - u.hp) * 0.35); continue; }
     u.hp = u.maxHp; u.morale = 100; u.routed = 0; u.cd = 0; u.targetId = null;
     u.order = { kind: 'idle', x: u.x, y: u.y }; u.postX = u.x; u.postY = u.y;
   }
@@ -52,14 +54,14 @@ export function stepWaves(s: GameState, dt: number): void {
     return;
   }
   if (s.phase !== 'battle') return;
-  if (!castle || castle.hp <= 0) return setPhase(s, 'lost');
+  if (!castle || castle.hp <= 0 || s.zones[s.zones.length - 1].owner === 'enemy') return setPhase(s, 'lost');
 
   s.battleTime += dt;
   while (s.spawnQueue.length && s.spawnQueue[0].at <= s.battleTime) {
     const it = s.spawnQueue.shift()!;
     const sp = map.spawns[it.lane % map.spawns.length];
     const u = spawnUnit(s, 'enemy', null, it.type, sp.x + (rand(s) - 0.5) * 9, sp.y + (rand(s) - 0.5) * 9, it.lane);
-    u.order = { kind: 'attackMove', x: castle.x, y: castle.y };
+    u.order = { kind: 'attackMove', x: sp.x - 20, y: sp.y }; // stepRoutes steers from here
     // later waves arrive battle-hardened: tougher and harder-hitting (stars over their heads)
     u.level = 1 + Math.min(2, Math.floor(s.wave / 3));
     u.maxHp = u.hp = ENEMIES[it.type].hp * (1 + 0.15 * (u.level - 1));

@@ -1,12 +1,16 @@
 import {
-  DAMAGE_VS_ARMOR, UNIT_DEFS, type GameState, type PlayerId, type Unit,
+  DAMAGE_VS_ARMOR, DECK_COVER, DECK_DAMAGE, DECK_RANGE, UNIT_DEFS, isFixedType, isStructureType, levelArmorBonus,
+  type GameState, type PlayerId, type Unit,
 } from '@burgwacht/shared';
-import { castleOf, edgeDist, getUnit, pushEvent } from './state';
+import { edgeDist, getUnit, pushEvent } from './state';
+import { dropFromWall } from './fortress';
 import { castlePos, moveToward } from './movement';
 import { gridOf } from './grid';
 
 /** how far a unit looks for trouble; fast riders scan wide so they get a run-up for their charge */
 const aggroOf = (u: Unit) => (UNIT_DEFS[u.type].speed >= 6 ? 26 : Math.max(UNIT_DEFS[u.type].range + 3, 9));
+/** effective weapon range: wall crowns add reach */
+export const rangeOf = (u: Unit) => UNIT_DEFS[u.type].range * (u.deck > 0 ? DECK_RANGE : 1);
 
 export const CHARGE_MIN = 14;
 const chargeReady = (u: Unit) => UNIT_DEFS[u.type].damageKind === 'charge' && u.charge >= CHARGE_MIN;
@@ -16,13 +20,15 @@ export function resolveDamage(attacker: Unit, target: Unit): number {
   const a = UNIT_DEFS[attacker.type], t = UNIT_DEFS[target.type];
   if (a.damage <= 0) return 0;
   const mult = DAMAGE_VS_ARMOR[a.damageKind][t.armor];
-  const armor = t.armorValue * (1 - (a.armorPierce ?? 0));
+  const armor = (t.armorValue + (isStructureType(target.type) ? levelArmorBonus(target.level) : 0)) * (1 - (a.armorPierce ?? 0));
   let raw = a.damage * mult * (1 + 0.12 * (attacker.level - 1)) * (1 + attacker.buff);
   const spearWall = a.damageKind === 'charge' && t.damageKind === 'spear' && target.order.kind === 'hold';
   if (chargeReady(attacker) && !spearWall) raw *= attacker.formation === 'wedge' ? 2.8 : 2.2; // Sturmangriff
   if (spearWall) raw *= 0.35;                                                                     // Speerwall stops riders
   if (a.range >= 8 && attacker.formation === 'line') raw *= 1.15;                                 // firing line
   if (t.range < 4 && target.formation === 'block') raw *= 0.85;                                   // shield wall
+  if (attacker.deck > 0) raw *= DECK_DAMAGE;                                                      // firing from the crown of a wall
+  if (target.deck > 0 && a.range >= 8) raw *= DECK_COVER;                                         // crenellations give cover
   return Math.max(1, (raw * 100) / (100 + armor));
 }
 
@@ -44,8 +50,13 @@ export function applyDamage(s: GameState, credit: Credit, victim: Unit, amt: num
   pushEvent(s, { k: 'death', x: victim.x, y: victim.y, type: victim.type });
   if (victim.side === 'enemy' && credit.owner !== null)
     s.players[credit.owner].gold += Math.round(UNIT_DEFS[victim.type].cost * 0.8);
+  if (isStructureType(victim.type)) { // a breach: let everyone know and drop the crew from the wall
+    pushEvent(s, { k: 'breach', slot: victim.slot, type: victim.type });
+    dropFromWall(s, victim);
+    return;
+  }
   const k = credit.unit;
-  if (k && k.hp > 0 && k.type !== 'castle') {
+  if (k && k.hp > 0 && !isFixedType(k.type)) {
     k.xp += 1;
     if (k.level < 3 && k.xp >= XP_FOR_LEVEL[k.level]) {
       k.level++;
@@ -55,25 +66,36 @@ export function applyDamage(s: GameState, credit: Credit, victim: Unit, amt: num
     }
   }
   gridOf(s).near(victim.x, victim.y, 7, o => {
-    if (o.hp <= 0 || o.side !== victim.side || o.type === 'castle') return;
+    if (o.hp <= 0 || o.side !== victim.side || isFixedType(o.type)) return;
     if (Math.hypot(o.x - victim.x, o.y - victim.y) < 7)
       o.morale -= (7 * 100) / UNIT_DEFS[o.type].morale;
   });
 }
 
-/** best target for u within `reach` (edge distance); preferred armor kinds first, else nearest */
+/** best target for u within `reach` (edge distance); preferred armor kinds first, else nearest.
+ *  Soldiers go for people first; walls only matter to siege gear, gates to everybody. Nobody can reach a man on a wall crown. */
 export function pickTarget(s: GameState, u: Unit, reach: number): Unit | undefined {
   const def = UNIT_DEFS[u.type];
+  const melee = def.range < 4;
+  const siege = def.armor === 'siege';
   let best: Unit | undefined, bestD = Infinity;
   let pref: Unit | undefined, prefD = Infinity;
+  let build: Unit | undefined, buildD = Infinity;
   gridOf(s).near(u.x, u.y, reach + 10, o => { // +10 covers the largest unit radius (castle 8.5)
     if (o.hp <= 0 || o.side === u.side) return;
     const d = edgeDist(u, o);
     if (d > reach) return;
+    if (isStructureType(o.type)) {
+      if (u.side !== 'enemy' || (!siege && o.type !== 'gate')) return;
+      if (d < buildD || (d === buildD && build && o.id < build.id)) { build = o; buildD = d; }
+      return;
+    }
+    if (o.deck > 0 && melee) return; // out of reach of swords
     if (d < bestD || (d === bestD && best && o.id < best.id)) { best = o; bestD = d; }
     if (def.prefers?.includes(UNIT_DEFS[o.type].armor) && (d < prefD || (d === prefD && pref && o.id < pref.id))) { pref = o; prefD = d; }
   });
-  return pref ?? best;
+  if (siege && build && (!best || def.prefers?.includes('structure'))) return build; // rams and trebuchets want walls
+  return pref ?? best ?? build;
 }
 
 function attack(s: GameState, u: Unit, t: Unit): void {
@@ -109,16 +131,16 @@ export function stepCombat(s: GameState, dt: number): void {
     if (u.routed > 0 || def.special === 'heal') continue; // routed: abilities.ts; healers: abilities.ts
     if (u.order.kind === 'move' || u.order.kind === 'retreat') continue;
     if (def.damage <= 0 && def.special !== 'buff') { if (!frenzied(s, u)) continue; }
+    const rng = rangeOf(u);
 
-    if (frenzied(s, u) && u.type !== 'castle') { // nobody left to reinforce: stop sniping from afar and rush the castle, so waves always end
-      const castle = castleOf(s);
-      if (def.damage > 0) { const tt = pickTarget(s, u, def.range); if (tt && u.cd <= 0) attack(s, u, tt); }
-      if (castle && edgeDist(u, castle) > def.range * 0.9) moveToward(u, castle.x, castle.y, dt);
+    if (frenzied(s, u) && !isFixedType(u.type)) { // nobody left to reinforce: stop sniping from afar and press on along the route, so waves always end
+      if (def.damage > 0) { const tt = pickTarget(s, u, rng); if (tt && u.cd <= 0) attack(s, u, tt); }
+      if (!pickTarget(s, u, Math.min(def.range, 5))) moveToward(u, u.order.x, u.order.y, dt); // stepRoutes already aimed this order along the route
       continue;
     }
 
-    const hold = u.order.kind === 'hold' || u.type === 'castle';
-    const reach = hold ? def.range : aggroOf(u);
+    const hold = u.order.kind === 'hold' || isFixedType(u.type) || u.deck > 0;
+    const reach = hold ? rng : aggroOf(u);
     let t = getUnit(s, u.targetId);
     if (t && (t.side === u.side || edgeDist(u, t) > reach + 4)) t = undefined;
     const forced = getUnit(s, u.order.targetId);
@@ -133,7 +155,7 @@ export function stepCombat(s: GameState, dt: number): void {
     }
 
     // ranged troops fall back while reloading when melee enemies get too close (stay near the post)
-    if (t && !hold && def.range >= 8 && def.special !== 'buff' && UNIT_DEFS[t.type].range < 4
+    if (t && !hold && def.range >= 8 && def.special !== 'buff' && !isStructureType(t.type) && UNIT_DEFS[t.type].range < 4
       && edgeDist(u, t) < Math.min(5, def.range * 0.3) && u.cd > 0.15 && Math.hypot(u.x - u.postX, u.y - u.postY) < 16) {
       const dx = u.x - t.x, dy = u.y - t.y, dd = Math.hypot(dx, dy) || 1;
       moveToward(u, u.x + (dx / dd) * 6, u.y + (dy / dd) * 6, dt, 0.9);
@@ -143,7 +165,7 @@ export function stepCombat(s: GameState, dt: number): void {
 
     if (t) {
       const d = edgeDist(u, t);
-      if (d <= def.range) {
+      if (d <= rng) {
         u.facing = Math.atan2(t.y - u.y, t.x - u.x);
         if (u.cd <= 0) attack(s, u, t);
       } else if (!hold) {
@@ -151,7 +173,7 @@ export function stepCombat(s: GameState, dt: number): void {
       }
       continue;
     }
-    if (u.type === 'castle') continue;
+    if (isFixedType(u.type)) continue;
     if (u.order.kind === 'attackMove') {
       if (moveToward(u, u.order.x, u.order.y, dt)) {
         if (u.side === 'player') {

@@ -1,10 +1,10 @@
 import {
-  MAPS, TROOPS, UNIT_DEFS, type Command, type Formation, type GameState, type PlayerId,
-  type Result, type Unit, type Vec2,
+  MAPS, MAX_ARMY, MAX_WALL_LEVEL, REBUILD_COST, REPAIR_COST, SLOT_WEIGHT, SQUAD_SIZE, TROOPS, UNIT_DEFS, UPGRADE_COST,
+  canManWalls, isFixedType, levelHpMul, squadCost, squadSlots, unitPrice, wallLineAt,
+  type Command, type Formation, type GameState, type PlayerId, type Result, type TroopType, type Unit, type Vec2,
 } from '@burgwacht/shared';
 import { castAbility } from './abilities';
-import { castleOf, getUnit, spawnUnit } from './state';
-import { MAX_ARMY } from '@burgwacht/shared';
+import { castleOf, getUnit, spawnStructure, spawnUnit, structureOfSlot } from './state';
 
 /** one slot per unit (same order as input). Short-ranged, tougher units take the front rows. */
 export function formationSlots(units: Unit[], f: Formation, center: Vec2, facing: number): Vec2[] {
@@ -36,12 +36,36 @@ const inZone = (s: GameState, x: number, y: number) => {
   return x >= z.x0 && x <= z.x1 && y >= z.y0 && y <= z.y1;
 };
 
+/** army slots a player is using right now (a catapult takes three) */
+export const armyUsed = (s: GameState, player: PlayerId) =>
+  s.units.reduce((n, u) => n + (u.owner === player && u.hp > 0 && u.type in SLOT_WEIGHT ? SLOT_WEIGHT[u.type as TroopType] : 0), 0);
+
+/**
+ * Where the members of a group stand when put down around (x, y).
+ * Marksmen next to a wall line line up on its crown; everybody else is kept off the wall, behind it.
+ */
+export function placementSlots(s: GameState, units: Unit[], x: number, y: number, facing = 0): Vec2[] {
+  const map = MAPS[s.mapId], z = map.placeZone;
+  const bar = wallLineAt(map, x);
+  const clamp = (p: Vec2): Vec2 => ({ x: Math.min(z.x1, Math.max(z.x0, p.x)), y: Math.min(z.y1, Math.max(z.y0, p.y)) });
+  if (bar >= 0 && units.every(u => u.type in TROOPS && canManWalls(u.type as TroopType))) {
+    const bx = map.barriers[bar].x, n = units.length, step = Math.min(1.9, (map.depth - 12) / Math.max(1, n));
+    const y0 = Math.min(map.depth - 6 - ((n - 1) * step) / 2, Math.max(6 + ((n - 1) * step) / 2, y));
+    return units.map((_, i) => ({ x: bx, y: y0 + (i - (n - 1) / 2) * step }));
+  }
+  const cx = bar >= 0 ? map.barriers[bar].x - 5.2 : x; // the rest stand behind the wall, not on it
+  return formationSlots(units, 'block', { x: cx, y }, facing).map(p => {
+    const b = wallLineAt(map, p.x, 4.2);
+    return clamp(b >= 0 ? { x: map.barriers[b].x - 5.2, y: p.y } : p);
+  });
+}
+
 const ownUnits = (s: GameState, player: PlayerId, ids: number[]): Unit[] | undefined => {
-  if (!Array.isArray(ids) || ids.length === 0 || ids.length > 200) return undefined;
+  if (!Array.isArray(ids) || ids.length === 0 || ids.length > 80) return undefined;
   const out: Unit[] = [];
   for (const id of new Set(ids)) {
     const u = getUnit(s, id);
-    if (!u || u.owner !== player || u.type === 'castle') return undefined;
+    if (!u || u.owner !== player || isFixedType(u.type)) return undefined;
     out.push(u);
   }
   return out;
@@ -70,13 +94,68 @@ export function applyCommand(s: GameState, player: PlayerId, c: Command): Result
     case 'buy': {
       if (!prepOnly) return fail('not_prep');
       if (typeof c.troop !== 'string' || !Object.hasOwn(TROOPS, c.troop)) return fail('bad_command');
-      const def = TROOPS[c.troop];
       if (!finite(c.x, c.y)) return fail('bad_command');
-      if (def.cost > me.gold) return fail('not_enough_gold');
-      if (s.units.filter(u => u.owner === player).length >= MAX_ARMY) return fail('army_full');
+      const cost = squadCost(c.troop);
+      if (cost > me.gold) return fail('not_enough_gold');
+      if (armyUsed(s, player) + squadSlots(c.troop) > MAX_ARMY) return fail('army_full');
       if (!inZone(s, c.x, c.y)) return fail('outside_zone');
-      me.gold -= def.cost;
-      spawnUnit(s, 'player', player, c.troop, c.x, c.y);
+      me.gold -= cost;
+      const members: Unit[] = [];
+      for (let i = 0; i < SQUAD_SIZE[c.troop]; i++) members.push(spawnUnit(s, 'player', player, c.troop, c.x, c.y));
+      const squad = members[0].id;
+      const slots = placementSlots(s, members, c.x, c.y);
+      members.forEach((u, i) => {
+        u.squad = squad; u.x = u.postX = slots[i].x; u.y = u.postY = slots[i].y; u.order = { kind: 'idle', x: u.x, y: u.y };
+      });
+      s.squads.push({ id: squad, troop: c.troop, owner: player, x: c.x, y: c.y });
+      return { ok: true };
+    }
+
+    case 'refill': {
+      if (!prepOnly) return fail('not_prep');
+      const sq = s.squads.find(q => q.id === c.squad && q.owner === player);
+      if (!sq) return fail('bad_command');
+      const alive = s.units.filter(u => u.squad === sq.id && u.hp > 0);
+      const missing = SQUAD_SIZE[sq.troop] - alive.length;
+      if (missing <= 0) return fail('squad_full');
+      if (unitPrice(sq.troop) * missing > me.gold) return fail('not_enough_gold');
+      if (armyUsed(s, player) + missing * SLOT_WEIGHT[sq.troop] > MAX_ARMY) return fail('army_full');
+      me.gold -= unitPrice(sq.troop) * missing;
+      const fresh: Unit[] = [];
+      for (let i = 0; i < missing; i++) fresh.push(spawnUnit(s, 'player', player, sq.troop, sq.x, sq.y));
+      const all = [...alive, ...fresh];
+      const slots = placementSlots(s, all, sq.x, sq.y);
+      all.forEach((u, i) => { if (fresh.includes(u)) { u.squad = sq.id; u.x = u.postX = slots[i].x; u.y = u.postY = slots[i].y; u.order = { kind: 'idle', x: u.x, y: u.y }; } });
+      return { ok: true };
+    }
+
+    case 'wall': {
+      if (c.op !== 'upgrade' && c.op !== 'repair' && c.op !== 'rebuild') return fail('bad_command');
+      const map = MAPS[s.mapId];
+      if (!Number.isInteger(c.slot) || c.slot < 0 || c.slot >= map.walls.length) return fail('bad_command');
+      const st = structureOfSlot(s, c.slot), kind = map.walls[c.slot].kind;
+      if (c.op === 'rebuild') {
+        if (!prepOnly) return fail('not_prep');
+        if (st) return fail('bad_command');
+        if (REBUILD_COST[kind] > me.gold) return fail('not_enough_gold');
+        me.gold -= REBUILD_COST[kind];
+        spawnStructure(s, c.slot);
+        return { ok: true };
+      }
+      if (!st || !(prepOnly || battle)) return fail('bad_command');
+      if (c.op === 'upgrade') {
+        if (st.level >= MAX_WALL_LEVEL) return fail('max_level');
+        const cost = UPGRADE_COST[kind][st.level - 1];
+        if (cost > me.gold) return fail('not_enough_gold');
+        me.gold -= cost;
+        const old = st.maxHp;
+        st.level++; st.maxHp = UNIT_DEFS[st.type].hp * levelHpMul(st.level); st.hp += st.maxHp - old;
+        return { ok: true };
+      }
+      if (st.hp >= st.maxHp - 0.5) return fail('bad_command');
+      const cost = Math.max(20, Math.round((REPAIR_COST[kind] * (1 - st.hp / st.maxHp)) / 5) * 5);
+      if (cost > me.gold) return fail('not_enough_gold');
+      me.gold -= cost; st.hp = st.maxHp;
       return { ok: true };
     }
 
@@ -85,13 +164,13 @@ export function applyCommand(s: GameState, player: PlayerId, c: Command): Result
       const us = ownUnits(s, player, c.ids);
       if (!us || !finite(c.x, c.y)) return fail('bad_command');
       if (!inZone(s, c.x, c.y)) return fail('outside_zone');
-      const slots = formationSlots(us, 'block', { x: c.x, y: c.y }, 0);
+      const slots = placementSlots(s, us, c.x, c.y);
       us.forEach((u, i) => {
-        const z = MAPS[s.mapId].placeZone;
-        u.x = Math.min(z.x1, Math.max(z.x0, slots[i].x));
-        u.y = Math.min(z.y1, Math.max(z.y0, slots[i].y));
+        u.x = slots[i].x; u.y = slots[i].y;
         u.postX = u.x; u.postY = u.y; u.order = { kind: 'idle', x: u.x, y: u.y };
       });
+      const moved = new Set(us.map(u => u.squad));
+      for (const q of s.squads) if (moved.has(q.id)) { q.x = c.x; q.y = c.y; }
       return { ok: true };
     }
 
