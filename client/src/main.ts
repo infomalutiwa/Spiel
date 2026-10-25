@@ -4,6 +4,7 @@ import { Connection, interpolation } from './net/connection';
 import { World } from './render/scene';
 import { UnitViews } from './render/units';
 import { Effects } from './render/effects';
+import { FortressViews } from './render/fortress';
 import { Controls } from './input/controls';
 import { Ui, reasonText } from './ui/ui';
 import { showGallery } from './gallery';
@@ -14,6 +15,7 @@ const canvas = document.getElementById('c') as HTMLCanvasElement;
 const world = new World(canvas, MAPS[DEFAULT_MAP]);
 const views = new UnitViews(world);
 const fx = new Effects(world, views);
+const fortress = new FortressViews(world);
 const ui = new Ui();
 let conn: Connection | undefined;
 let controls: Controls | undefined;
@@ -31,6 +33,8 @@ function loop(now: number) {
     const s = conn.latest();
     controls.prune(s ?? ({ units: [] } as never));
     views.sync(ip, conn.you, controls.selected, dt);
+    fortress.sync(ip?.b.units ?? [], s?.zones, dt);
+    fortress.showCrown(s?.phase === 'prep');
     world.setPlacementZone(s?.phase === 'prep');
     fx.update(dt);
     controls.frame(dt);
@@ -38,10 +42,10 @@ function loop(now: number) {
   } else if (gallery) { world.frame(dt, { x: 0, z: 0 }, 0); }
   else { // lobby: slow cinematic orbit over the castle
     lobbyAngle += dt * 0.08;
-    const cs = world.map.castle;
-    world.target.set(cs.x + 8 + Math.sin(lobbyAngle) * 10, 0, cs.y);
-    world.dist = 78; world.pitch = 0.62;
-    world.yaw = Math.sin(lobbyAngle * 0.7) * 0.35;
+    const o = world.map.barriers[0];
+    world.target.set(o.x - 12 + Math.sin(lobbyAngle) * 14, 0, o.gateY + Math.cos(lobbyAngle * 0.8) * 6);
+    world.dist = 62; world.pitch = 0.5;
+    world.yaw = 0.9 + Math.sin(lobbyAngle * 0.7) * 0.3;
     world.frame(dt, { x: 0, z: 0 }, 0);
   }
   requestAnimationFrame(loop);
@@ -56,8 +60,10 @@ async function enter(c: Connection) {
   controls = new Controls(world, views, c, () => c.latest());
   ui.buildHud(c, controls);
   controls.onError = m => ui.toast(m, true);
-  const cs = world.map.castle;
-  world.target.set(cs.x + 34, 0, cs.y); world.yaw = 0; world.dist = 95; world.pitch = 0.95;
+  controls.fortress = fortress;
+  fx.onBanner = t => ui.fortressBanner(t, world.map);
+  const [outer, inner] = world.map.barriers;
+  world.target.set((outer.x + inner.x) / 2 - 6, 0, world.map.depth / 2); world.yaw = 0; world.dist = 100; world.pitch = 0.95;
   minimap = new Minimap(world, document.getElementById('ui')!);
   wire(c, true);
 }

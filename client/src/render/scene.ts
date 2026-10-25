@@ -47,6 +47,8 @@ export class World {
   private content = new THREE.Group();
   private clouds: THREE.Object3D[] = [];
   private pollen!: THREE.Points;
+  /** called after every (re)build so overlays that belong to the map can follow */
+  onMapBuilt: ((m: MapDef) => void)[] = [];
   private zone?: THREE.Group;
   private raycaster = new THREE.Raycaster();
   private ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
@@ -111,6 +113,7 @@ export class World {
     (this.scene.fog as THREE.Fog).color.set(this.look.fog);
     this.scene.background = this.skyTexture();
     this.build();
+    this.onMapBuilt.forEach(f => f(map));
   }
 
   resize() {
@@ -138,19 +141,37 @@ export class World {
     return (noise2(x * 0.03, z * 0.03) * amp + noise2(x * 0.1, z * 0.1) * 2) * smooth(2, 50, out);
   }
 
-  /** distance from (x,z) to the wobbling dirt road between a spawn and the castle */
+  /** the way the enemy walks: spawn → outer gate → inner gate → keep */
+  private route(): { x: number; y: number }[] {
+    const m = this.map, [o, i] = m.barriers;
+    const pts = m.spawns.length ? [m.spawns[0]] : [];
+    return [...pts, { x: o.x + 16, y: o.gateY }, { x: o.x, y: o.gateY }, { x: o.x - 16, y: o.gateY },
+      { x: i.x + 16, y: i.gateY }, { x: i.x, y: i.gateY }, { x: i.x - 16, y: i.gateY }, { x: m.castle.x + 14, y: m.castle.y }];
+  }
+  private routeCache?: { id: string; pts: { x: number; y: number }[] };
+
+  /** distance from (x,z) to the dirt road (every spawn joins the route at the outer gate) */
   private roadDist(x: number, z: number): number {
-    const c = this.map.castle;
+    const m = this.map;
+    if (this.routeCache?.id !== m.id) this.routeCache = { id: m.id, pts: this.route() };
+    const pts = this.routeCache.pts;
     let best = 1e9;
-    for (const sp of this.map.spawns) {
-      const dx = c.x - sp.x, dy = c.y - sp.y, L2 = dx * dx + dy * dy;
-      const t = Math.min(1, Math.max(0, ((x - sp.x) * dx + (z - sp.y) * dy) / L2));
-      const wob = Math.sin(t * 9 + sp.x * 0.05 + sp.y * 0.13) * 5 * Math.sin(t * Math.PI);
+    const seg = (ax: number, ay: number, bx: number, by: number) => {
+      const dx = bx - ax, dy = by - ay, L2 = dx * dx + dy * dy || 1;
+      const t = Math.min(1, Math.max(0, ((x - ax) * dx + (z - ay) * dy) / L2));
+      const wob = Math.sin(t * 7 + ax * 0.05) * 2.2 * Math.sin(t * Math.PI) * (ax > m.barriers[0].x ? 1 : 0.2);
       const L = Math.sqrt(L2), nx = -dy / L, ny = dx / L;
-      const px = sp.x + dx * t + nx * wob, py = sp.y + dy * t + ny * wob;
-      best = Math.min(best, Math.hypot(x - px, z - py));
-    }
+      best = Math.min(best, Math.hypot(x - (ax + dx * t + nx * wob), z - (ay + dy * t + ny * wob)));
+    };
+    for (const sp of m.spawns) seg(sp.x, sp.y, pts[1].x, pts[1].y);
+    for (let k = 1; k < pts.length - 1; k++) seg(pts[k].x, pts[k].y, pts[k + 1].x, pts[k + 1].y);
     return best;
+  }
+  /** how far inside a capture circle's cobbled plaza (negative = inside) */
+  private plazaDist(x: number, z: number): number {
+    let best = 1e9;
+    for (const zn of this.map.zones) best = Math.min(best, Math.hypot(x - zn.x, z - zn.y) - zn.r * 0.78);
+    return Math.min(best, Math.hypot(x - this.map.castle.x, z - this.map.castle.y) - 16);
   }
 
   private buildTerrain() {
@@ -174,10 +195,10 @@ export class World {
       tmp.multiplyScalar(0.94 + noise2(x * 0.6, z * 0.6) * 0.1);
       tmp.lerp(rim, smooth(3, 14, h) * 0.35); // hills get a deeper green
       const inside = smooth(-2, 3, Math.min(x, m.width - x, z, m.depth - z)); // roads fade out beyond the playfield
-      const rd = this.roadDist(x, z);
-      const castleFade = smooth(m.castle.x < 100 || true ? 10 : 0, 22, Math.hypot(x - m.castle.x, z - m.castle.y)); // plaza around the castle stays cobbled-dirt
-      const k = (1 - smooth(2.2, 5, rd)) * inside * (0.35 + 0.65 * castleFade) + (1 - smooth(9, 20, Math.hypot(x - m.castle.x, z - m.castle.y))) * 0.55;
-      tmp.lerp(edge, Math.min(1, k) * 0.85).lerp(path, Math.min(1, k) * (1 - smooth(1, 3, rd) * 0.5) * 0.8);
+      const rd = this.roadDist(x, z), pd = this.plazaDist(x, z);
+      const road = (1 - smooth(1.8, 4.6, rd)) * inside;
+      const plaza = (1 - smooth(-1, 4, pd)) * inside; // cobbled courtyards inside the walls
+      tmp.lerp(edge, Math.min(1, road * 0.85 + plaza * 0.7)).lerp(path, Math.min(1, road * (1 - smooth(1, 3, rd) * 0.5) * 0.8 + plaza * 0.55));
       col[i * 3] = tmp.r; col[i * 3 + 1] = tmp.g; col[i * 3 + 2] = tmp.b;
     }
     geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
@@ -255,18 +276,42 @@ export class World {
       for (const [nm, list] of byName)
         void this.instanced(into, nm, heights[nm.replace(/^hex\/building_/, '').replace(/_(blue|red|green)$/, '')] ?? 6, list, true);
     };
-    const vSpots: [number, number][] = m.theme === 'forest'
-      ? [[m.width * 0.5, m.depth * 0.12], [m.width * 0.72, m.depth * 0.9], [m.castle.x + 70, m.depth * 0.88]]
-      : m.theme === 'valley'
-        ? [[m.castle.x - 70, m.depth * 0.14], [m.castle.x + 75, m.depth * 0.86], [m.width * 0.12, m.depth * 0.8], [m.width * 0.88, m.depth * 0.18]]
-        : [[m.width * 0.5, m.depth * 0.1], [m.width * 0.42, m.depth * 0.9], [m.castle.x + 70, m.depth * 0.5]];
+    const east = m.barriers[0].x;
+    const vSpots: [number, number][] = [[east + 38, m.depth * 0.14], [east + 62, m.depth * 0.86], [east + 88, m.depth * 0.2], [east + 100, m.depth * 0.8]];
     vSpots.forEach(([x, z], i) => village(x, z, 9, 20, colors[i % colors.length]));
     // camps along the roads
     void this.instanced(into, 'hex/tent', 4.2, place(Math.round(14 * area), (x, z) => inField(x, z, 4) && this.roadDist(x, z) > 10 && this.roadDist(x, z) < 22 && !inZone(x, z) && !nearCastle(x, z, 40), [0.9, 1.2], 0));
     void this.instanced(into, 'hex/barrel', 1.6, place(Math.round(30 * area), (x, z) => inField(x, z, 4) && !onRoad(x, z, 6) && (this.roadDist(x, z) < 22) && !inZone(x, z) && !nearCastle(x, z, 36), [0.8, 1.3], 0));
 
+    // the pass: a ridge of mountains closes the north and south edges (and the far east, leaving the road open)
+    const ridge = (pts: Spot[]) => ['hex/mountain_A_grass_trees', 'hex/mountain_B_grass_trees', 'hex/mountain_C_grass_trees'].forEach((n, k) =>
+      void this.instanced(into, n, m.theme === 'valley' ? 46 : 36, pts.filter((_, i) => i % 3 === k)));
+    const ridgePts: Spot[] = [];
+    for (let x = -22; x <= m.width + 24; x += 17) for (const z of [-15, m.depth + 15]) ridgePts.push({ x: x + (R() - 0.5) * 6, z: z + (R() - 0.5) * 6 * (z < 0 ? -1 : 1), s: 0.85 + R() * 0.5, r: R() * 6.28 });
+    for (let z = -4; z <= m.depth + 4; z += 17) {
+      ridgePts.push({ x: -18 + (R() - 0.5) * 4, z, s: 0.9 + R() * 0.5, r: R() * 6.28 });
+      if (m.spawns.every(sp => Math.abs(sp.y - z) > 15)) ridgePts.push({ x: m.width + 16 + (R() - 0.5) * 4, z, s: 0.9 + R() * 0.5, r: R() * 6.28 });
+    }
+    ridge(ridgePts);
+
+    // life inside the walls: barrels, crates, weapon racks and training targets just behind each wall
+    const props = ['hex/barrel', 'hex/crate_A_big', 'hex/weaponrack', 'hex/bucket_arrows', 'hex/sack', 'hex/target', 'hex/crate_B_small', 'hex/wheelbarrow'];
+    const propSpots = new Map<string, Spot[]>(props.map(p => [p, []]));
+    m.barriers.forEach((b, bi) => {
+      for (let y = 10, k = 0; y < m.depth - 8; y += 9 + R() * 6, k++) {
+        if (Math.abs(y - b.gateY) < 15) continue;
+        const kind = props[(k + bi * 3) % props.length];
+        propSpots.get(kind)!.push({ x: b.x - 6.6 - R() * 2.5, z: y, s: 0.9 + R() * 0.3, r: R() * 6.28 });
+      }
+    });
+    const heights: Record<string, number> = { 'hex/barrel': 1.7, 'hex/crate_A_big': 1.9, 'hex/weaponrack': 2.6, 'hex/bucket_arrows': 1.5, 'hex/sack': 1.4, 'hex/target': 2.8, 'hex/crate_B_small': 1.4, 'hex/wheelbarrow': 1.7 };
+    for (const [n, list] of propSpots) void this.instanced(into, n, heights[n], list, true);
+    // tents and fire pits where the troops of the Vorhof rest
+    const vz = m.zones[0];
+    void this.instanced(into, 'hex/tent', 4.4, [-1, 1].map((sg, i) => ({ x: vz.x + vz.r * 0.55, z: vz.y + sg * (vz.r * 0.75), s: 1, r: i * 3 })), true);
+
     // ground cover (Kenney Nature Kit): flowers, bushes, tufts, rocks
-    const meadow = (x: number, z: number) => inField(x, z, 2) && !onRoad(x, z, 4) && !nearCastle(x, z, 14);
+    const meadow = (x: number, z: number) => inField(x, z, 2) && !onRoad(x, z, 4) && !nearCastle(x, z, 14) && this.plazaDist(x, z) > 2;
     for (const f of ['flower_redA', 'flower_yellowA', 'flower_purpleA', 'flower_redB', 'flower_yellowB', 'flower_purpleC'])
       void this.instanced(into, f, 1.1, place(Math.round(90 * area), meadow, [0.8, 1.4], 0));
     void this.instanced(into, 'plant_bush', 1.5, place(Math.round(100 * area), (x, z) => meadow(x, z) || outside(x, z, 2), [0.8, 1.7], 30));

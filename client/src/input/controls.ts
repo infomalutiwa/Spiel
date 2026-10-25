@@ -1,13 +1,14 @@
 import { audio } from '../audio';
 import * as THREE from 'three';
 import {
-  UNIT_DEFS, type AbilityId, type Command, type Formation, type Snapshot, type TroopType, type UnitSnap,
+  SQUAD_SIZE, UNIT_DEFS, canManWalls, wallLineAt, type AbilityId, type Command, type Formation, type Snapshot, type TroopType, type UnitSnap,
 } from '@burgwacht/shared';
 import type { Connection } from '../net/connection';
 import type { World } from '../render/scene';
 import type { UnitViews } from '../render/units';
 import { loadBaked } from '../render/baked';
 import { modelInstance } from '../render/assets';
+import type { FortressViews } from '../render/fortress';
 
 export type Mode =
   | { k: 'select' }
@@ -29,6 +30,9 @@ export function idsInBox(
 
 export class Controls {
   selected = new Set<number>();
+  /** wall / gate / tower slot whose panel is open, or -1 */
+  wallSel = -1;
+  fortress?: FortressViews;
   mode: Mode = { k: 'select' };
   formation: Formation = 'block';
   onChange: () => void = () => {};
@@ -40,6 +44,7 @@ export class Controls {
   private ghost?: THREE.Group;
   private ghostFor?: string;
   private ringGhost: THREE.Mesh;
+  private crownGhost: THREE.Mesh;
   private lastClick = { t: 0, id: -1 };
   private box = document.getElementById('selbox')!;
   /** touch gestures: tap = click, drag = pan, pinch = zoom, long-press + drag = box select */
@@ -63,6 +68,27 @@ export class Controls {
       new THREE.MeshBasicMaterial({ color: '#fff3c4', transparent: true, opacity: 0.9, depthWrite: false, side: THREE.DoubleSide }));
     this.ringGhost.rotation.x = -Math.PI / 2; this.ringGhost.visible = false; this.ringGhost.renderOrder = 6;
     world.scene.add(this.ringGhost);
+    this.crownGhost = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: '#ffe08a', transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide }));
+    this.crownGhost.rotation.x = -Math.PI / 2; this.crownGhost.visible = false; this.crownGhost.renderOrder = 7;
+    world.scene.add(this.crownGhost);
+  }
+
+  /** every member of the squads the given units belong to */
+  private expandSquads(ids: Iterable<number>): Set<number> {
+    const s = this.snapshot(), out = new Set<number>(ids);
+    if (!s) return out;
+    const squads = new Set(s.units.filter(u => out.has(u.id) && u.squad > 0).map(u => u.squad));
+    for (const u of s.units) if (u.owner === this.me() && squads.has(u.squad)) out.add(u.id);
+    return out;
+  }
+
+  selectSquad(squad: number, focus = false) {
+    const s = this.snapshot();
+    if (!s) return;
+    const mem = s.units.filter(u => u.owner === this.me() && u.squad === squad);
+    this.selected = new Set(mem.map(u => u.id)); this.wallSel = -1;
+    if (focus && mem.length) this.world.focus(mem.reduce((a, u) => a + u.x, 0) / mem.length, mem.reduce((a, u) => a + u.y, 0) / mem.length);
+    this.onChange();
   }
 
   /** swap in a fresh socket after a reconnect */
@@ -131,7 +157,8 @@ export class Controls {
       const ids = idsInBox(s.units, u => { const p = this.views.posOf(u.id) ?? u; return this.world.worldToScreen(p.x, p.y, 1); },
         this.me(), d.x, d.y, e.clientX, e.clientY);
       if (!e.shiftKey) this.selected.clear();
-      ids.forEach(i => this.selected.add(i));
+      this.expandSquads(ids).forEach(i => this.selected.add(i));
+      this.wallSel = -1;
       this.onChange();
       return;
     }
@@ -154,14 +181,20 @@ export class Controls {
     }
     const u = this.pick(g, true);
     if (u) {
+      this.wallSel = -1;
       const dbl = performance.now() - this.lastClick.t < 350 && this.lastClick.id === u.id;
       this.lastClick = { t: performance.now(), id: u.id };
-      if (dbl) { // select every own unit of this type
+      const squad = this.expandSquads([u.id]);
+      if (dbl) { // select every own squad of this type
         if (!e.shiftKey) this.selected.clear();
         this.snapshot()?.units.filter(x => x.owner === this.me() && x.type === u.type).forEach(x => this.selected.add(x.id));
-      } else if (e.shiftKey) { this.selected.has(u.id) ? this.selected.delete(u.id) : this.selected.add(u.id); }
-      else { this.selected = new Set([u.id]); }
-    } else if (!e.shiftKey) this.selected.clear();
+      } else if (e.shiftKey) { const all = [...squad].every(i => this.selected.has(i)); squad.forEach(i => (all ? this.selected.delete(i) : this.selected.add(i))); }
+      else { this.selected = squad; }
+    } else {
+      const slot = this.fortress?.slotAt(g.x, g.y, 2.4) ?? -1;
+      if (slot >= 0 && (!this.isTouch || !this.selected.size)) { this.wallSel = slot; this.selected.clear(); }
+      else if (!e.shiftKey) { this.selected.clear(); this.wallSel = -1; }
+    }
     this.onChange();
   }
 
@@ -256,7 +289,7 @@ export class Controls {
     if (tg.boxing) {
       const ids = idsInBox(s.units, u => { const p = this.views.posOf(u.id) ?? u; return this.world.worldToScreen(p.x, p.y, 1); },
         this.me(), tg.sx, tg.sy, e.clientX, e.clientY);
-      this.selected = new Set(ids); this.onChange();
+      this.selected = this.expandSquads(ids); this.wallSel = -1; this.onChange();
       return;
     }
     if (tg.moved) return;
@@ -273,14 +306,14 @@ export class Controls {
     this.selected = new Set(this.snapshot()?.units.filter(u => u.owner === this.me() && u.type !== 'castle').map(u => u.id));
     this.onChange();
   }
-  clearSelection() { this.selected.clear(); this.cancel(); this.onChange(); }
+  clearSelection() { this.selected.clear(); this.wallSel = -1; this.cancel(); this.onChange(); }
 
   private keydown(e: KeyboardEvent) {
     if ((e.target as HTMLElement)?.tagName === 'INPUT') return;
     const k = e.key.toLowerCase();
     this.keys.add(k);
     const battle = this.phase() === 'battle';
-    if (k === 'escape') { this.cancel(); this.selected.clear(); this.onChange(); }
+    if (k === 'escape') { this.cancel(); this.selected.clear(); this.wallSel = -1; this.onChange(); }
     else if (k === 'a' && e.ctrlKey) {
       e.preventDefault();
       this.selected = new Set(this.snapshot()?.units.filter(u => u.owner === this.me() && u.type !== 'castle').map(u => u.id));
@@ -351,14 +384,21 @@ export class Controls {
           const g = new THREE.Group(); g.add(obj); this.ghost = g; this.world.scene.add(g);
         })();
       }
-      const zn = this.world.map.placeZone;
+      const zn = this.world.map.placeZone, map = this.world.map, troop = mode.troop, n = SQUAD_SIZE[troop];
       const ok = g.x >= zn.x0 && g.x <= zn.x1 && g.y >= zn.y0 && g.y <= zn.y1;
-      if (this.ghost) { this.ghost.visible = true; this.ghost.position.set(g.x, 0, g.y); }
-      this.ringGhost.visible = true; this.ringGhost.position.set(g.x, 0.15, g.y);
-      this.ringGhost.scale.setScalar(Math.max(1.4, UNIT_DEFS[mode.troop].radius * 1.7));
+      const bar = wallLineAt(map, g.x), crown = bar >= 0 && canManWalls(troop);
+      const px = crown ? map.barriers[bar].x : bar >= 0 ? map.barriers[bar].x - 5.2 : g.x;
+      const radius = 1.2 + Math.sqrt(n) * 1.15;
+      if (this.ghost) { this.ghost.visible = !crown; this.ghost.position.set(px, 0, g.y); }
+      this.crownGhost.visible = crown;
+      if (crown) { const len = Math.min(map.depth - 12, n * 1.9 + 1.2); this.crownGhost.position.set(px, 3.55, Math.min(map.depth - 6 - len / 2, Math.max(6 + len / 2, g.y))); this.crownGhost.scale.set(1.6, len, 1); }
+      this.ringGhost.visible = !crown; this.ringGhost.position.set(px, 0.15, g.y);
+      this.ringGhost.scale.setScalar(radius);
       (this.ringGhost.material as THREE.MeshBasicMaterial).color.set(ok ? '#fff3c4' : '#ff8d8d');
+      (this.crownGhost.material as THREE.MeshBasicMaterial).color.set(ok ? '#ffe08a' : '#ff8d8d');
     } else {
       if (this.ghost) this.ghost.visible = false;
+      this.crownGhost.visible = false;
       if (mode.k === 'ability' && g) {
         this.ringGhost.visible = true; this.ringGhost.position.set(g.x, 0.15, g.y);
         this.ringGhost.scale.setScalar(mode.id === 'arrowRain' ? 7 : 12);

@@ -11,6 +11,8 @@ export const DECK_DAMAGE = 1.1;
 export const DECK_COVER = 0.75;
 /** how high the wall crown is above the ground (render only) */
 export const DECK_HEIGHT = 3.3;
+export const TOWER_HEIGHT = 6.4;
+export const deckHeight = (t: UnitType) => (t === 'tower' ? TOWER_HEIGHT : t === 'wall' ? DECK_HEIGHT : 0);
 
 export { isFixedType, isStructureType };
 

@@ -174,6 +174,18 @@ export class Effects {
         this.ring(ev.x, ev.y, 2.4, '#ffd75e', 0.7);
         this.spark(ev.x, 1.0, ev.y, '#ffd75e', { n: 12, speed: 2.5, up: 5, g: 6, life: 0.9, s0: 0.45, s1: 0.1 });
         break;
+      case 'breach': {
+        const w = this.world.map.walls[ev.slot];
+        if (w) {
+          this.spark(w.x, 1.2, w.y, '#cbbd9d', { n: 26, speed: 6, up: 5, g: 8, life: 1.3, s0: 1.4, s1: 3.6, o0: 0.9 });
+          this.spark(w.x, 3, w.y, '#8b8580', { n: 12, speed: 4, up: 7, g: 14, life: 1.0, s0: 0.5, s1: 0.9 });
+          this.ring(w.x, w.y, 5, '#cbbd9d', 0.8);
+          audio.play('siege', 1); audio.play('death', 0.8);
+        }
+        this.onBanner(`breach:${ev.type}`);
+        break;
+      }
+      case 'zone': audio.play('horn'); this.onBanner(`zone:${ev.id}:${ev.owner}`); break;
       case 'wave': audio.play('horn'); this.onBanner(`wave:${ev.wave}`); break;
       case 'phase': if (ev.phase === 'won') audio.play('win'); else if (ev.phase === 'lost') audio.play('lose'); this.onBanner(`phase:${ev.phase}`); break;
     }

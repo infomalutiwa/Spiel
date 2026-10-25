@@ -1,9 +1,8 @@
 # Burgwacht 🏰
 
-Ein kooperatives 3D-Burgverteidigungsspiel für zwei – gespielt im Browser, jede auf ihrem eigenen Gerät.
-Gegnerwellen greifen eure Burg an; ihr kauft Truppen, stellt sie auf und führt sie im Kampf.
-Acht Truppentypen mit Stärken und Schwächen (Speerträger gegen Reiter, Reiter gegen Bogenschützen, Armbrust gegen Rüstung …),
-Formationen, Fähigkeiten und zwölf Wellen auf drei großen Karten (Sonnenwiese, Waldpass, Burg im Tal) – bis zu 160 Einheiten pro Spielerin gleichzeitig – in einer gemütlichen Low-Poly-Welt.
+Ein kooperatives 3D-Festungsspiel für zwei – gespielt im Browser (Handy, Tablet oder Rechner), jede auf ihrem eigenen Gerät.
+Die Angreifer kommen über **eine** Straße zum Tor eurer Festung. Ihr stellt **Trupps** auf die Mauerkrone und ans Tor, baut die Mauern aus,
+und wenn das Tor bricht, verteidigt ihr drei Kontrollpunkte bis zum König. Acht Truppentypen, drei Karten, zwölf Wellen, gemütliche Low-Poly-Welt.
 
 ## Starten
 
@@ -50,17 +49,20 @@ Mit `ALLOWED_ORIGINS` (vom Skript gesetzt) akzeptiert der Server nur Verbindunge
 
 ## Spielablauf
 
-- **Aufstellphase** (40 s oder bis beide „Bereit" sind): Truppen kaufen (Karte unten anklicken, dann auf die helle Fläche klicken), mit Rechtsklick umplatzieren. Oben seht ihr, was als Nächstes kommt und aus welcher Richtung. Die Minikarte unten rechts zeigt alles und springt per Klick.
-- **Kampf**: Truppen auswählen (Klick, Box ziehen, Doppelklick = alle gleichen), mit Rechtsklick bewegen oder angreifen, Formation wählen.
-- Nach jeder Welle gibt's Gold, die Truppen werden geheilt. Fällt die Burg, ist das Spiel verloren; überlebt ihr alle 12 Wellen, habt ihr gewonnen.
+- **Aufstellphase** (40 s oder bis beide „Bereit" sind): Truppen werden als **Trupps** gekauft (10 Bogenschützen, 8 Speerträger, 6 Ritter, 5 Reiter, 6 Armbrustschützen, 4 Magier, 3 Heiler, 1 Katapult). Karte unten antippen, dann in den Hof tippen – oder bei Fernkämpfern auf die **goldene Mauerkrone**. Pro Spielerin gibt es **30 Armee-Plätze** (ein Katapult zählt drei). Oben seht ihr, was als Nächstes kommt.
+- **Die Festung:** zwei Mauerringe mit je einem Tor und Türmen. Gegner kommen nicht durch, solange Mauer und Tor stehen. Fußvolk greift das **Tor** an, **Rammen** und **Wurfmaschinen** auch Mauern und Türme. Mauer, Tor und Turm antippen: **verbessern** (Stufe 1–3), **reparieren** (auch im Kampf), **wiederaufbauen** (nur in der Aufstellphase).
+- **Mauerkrone:** Fernkämpfer auf einer Mauer oder einem Turm schießen 30 % weiter, treffen 10 % härter, haben Deckung gegen Fernkampf, und Schwertkämpfer kommen nicht an sie heran. Fällt das Mauerstück, stürzen sie hinunter.
+- **Katapulte** stehen hinter der Mauer und schießen über sie hinweg (Reichweite 30) – besonders gegen Rammen und Gruppen am Tor.
+- **Kontrollpunkte:** ① Vorhof, ② Schlossplatz, ③ Thronvorplatz. Die Gegner erobern sie der Reihe nach: Stehen mehr von ihnen als von euch in der Zone, füllt sich der Balken. Fällt der letzte Punkt oder die Burg, ist die Welle verloren. Zwischen den Wellen sind alle Punkte wieder frei, Trupps könnt ihr für Gold **auffüllen** (＋ am Trupp-Symbol).
+- **Kampf:** Trupps auswählen (Tippen, Box ziehen oder Trupp-Leiste links), bewegen, angreifen, Formation wählen. Nach jeder Welle gibt's Gold, die Truppen werden geheilt, die Gebäude flicken ein Drittel selbst. Überlebt ihr alle 12 Wellen, habt ihr gewonnen.
 
 ### Rollen und Mechaniken
 
-- **Reiter:** laufen sich warm – ein Sturmangriff aus dem Anlauf (≈ 1 s Laufen) richtet mehr als doppelt so viel Schaden an, im **Keil** (`2`) noch mehr. Sie jagen bevorzugt Bogenschützen, Magier und Heiler. Gegner-Plünderer tun dasselbe mit euren Fernkämpfern!
-- **Speerträger:** In **Halten** (`H`) bilden sie einen Speerwall, der Reiter fast ganz abprallen lässt.
-- **Bogenschützen:** haben die größte Reichweite, weichen beim Nachladen vor Nahkämpfern zurück und schießen in der **Linie** (`1`) 15 % härter. Schwere Rüstung (Eisenwachen, Brute) macht ihnen zu schaffen – dafür sind **Armbrust** und **Magier** da.
-- **Block** (`3`): Nahkämpfer nehmen 15 % weniger Schaden (Schildwall).
-- Gegner werden mit jeder Welle zahlreicher und ab Welle 4 und 7 erfahrener (Sterne über dem Kopf: mehr Leben und Schaden); wer zu lange herumsteht, bekommt Besuch von Eisenwachen, Rammen und Schamanen.
+- **Reiter:** Sturmangriff aus dem Anlauf (≈ 1 s Laufen) richtet über doppelten Schaden an, im **Keil** (`2`) noch mehr. Sie jagen Bogenschützen, Magier und Heiler – die Reserve im Hof, wenn der Feind durchbricht.
+- **Speerträger:** In **Halten** (`H`) bilden sie einen Speerwall am Tor, der Reiter fast ganz abprallen lässt.
+- **Bogenschützen:** weichen beim Nachladen zurück, schießen in der **Linie** (`1`) 15 % härter. Schwere Rüstung (Eisenwachen, Grobiane) macht ihnen zu schaffen – dafür sind **Armbrust** und **Magier** da.
+- **Block** (`3`): Nahkämpfer nehmen 15 % weniger Schaden.
+- Gegner werden mit jeder Welle zahlreicher und ab Welle 4 und 7 erfahrener (Sterne über dem Kopf); wer zu lange herumsteht, bekommt Besuch von Eisenwachen, Rammen und Schamanen.
 
 | Taste | Aktion |
 |---|---|
@@ -77,7 +79,7 @@ Mit `ALLOWED_ORIGINS` (vom Skript gesetzt) akzeptiert der Server nur Verbindunge
 ## Aufbau
 
 ```
-shared/   Typen und Datentabellen (Truppen, Konter, Wellen, Karten)
+shared/   Typen und Datentabellen (Truppen, Trupps, Mauern, Konter, Wellen, Karten)
 server/   deterministische Simulation (20 Hz) + WebSocket-Räume (ws)
 client/   Three.js-Client (Vite): Szene, Einheiten, Effekte, Steuerung, HUD
 e2e/      Zwei-Fenster-Smoketest

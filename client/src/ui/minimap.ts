@@ -32,11 +32,20 @@ export class Minimap {
     const g = this.bg.getContext('2d')!;
     g.fillStyle = THEME_BG[m.theme]; g.fillRect(0, 0, W, H);
     const sx = W / m.width, sy = H / m.depth;
-    g.strokeStyle = 'rgba(224,188,140,0.95)'; g.lineWidth = 3; g.lineCap = 'round';
-    for (const sp of m.spawns) { g.beginPath(); g.moveTo(sp.x * sx, sp.y * sy); g.lineTo(m.castle.x * sx, m.castle.y * sy); g.stroke(); }
-    const z = m.placeZone;
-    g.fillStyle = 'rgba(255,243,196,0.22)'; g.fillRect(z.x0 * sx, z.y0 * sy, (z.x1 - z.x0) * sx, (z.y1 - z.y0) * sy);
-    g.strokeStyle = 'rgba(255,243,196,0.7)'; g.lineWidth = 1; g.strokeRect(z.x0 * sx, z.y0 * sy, (z.x1 - z.x0) * sx, (z.y1 - z.y0) * sy);
+    // the road: spawn → outer gate → inner gate → keep
+    const [o, i] = m.barriers;
+    g.strokeStyle = 'rgba(224,188,140,0.95)'; g.lineWidth = 3; g.lineCap = 'round'; g.lineJoin = 'round';
+    for (const sp of m.spawns) { g.beginPath(); g.moveTo(sp.x * sx, sp.y * sy); g.lineTo(o.x * sx, o.gateY * sy); g.lineTo(i.x * sx, i.gateY * sy); g.lineTo(m.castle.x * sx, m.castle.y * sy); g.stroke(); }
+    // capture points
+    m.zones.forEach(zn => { g.fillStyle = 'rgba(255,243,196,0.22)'; g.beginPath(); g.arc(zn.x * sx, zn.y * sy, zn.r * sx, 0, 7); g.fill(); g.strokeStyle = 'rgba(255,255,255,0.55)'; g.lineWidth = 1; g.stroke(); });
+    // wall lines with gaps for the gates
+    g.lineWidth = 3; g.lineCap = 'butt';
+    for (const [bi, b] of m.barriers.entries()) {
+      g.strokeStyle = '#7d7a76';
+      const ys = [0, ...m.walls.filter(w => w.bar === bi && w.kind === 'gate').flatMap(w => [w.y - 4.5, w.y + 4.5]), m.depth];
+      for (let k = 0; k < ys.length; k += 2) { g.beginPath(); g.moveTo(b.x * sx, ys[k] * sy); g.lineTo(b.x * sx, ys[k + 1] * sy); g.stroke(); }
+      g.fillStyle = '#c9a25a'; g.fillRect(b.x * sx - 2, (b.gateY - 4) * sy, 4, 8 * sy);
+    }
     g.fillStyle = '#ee6b6b';
     for (const sp of m.spawns) { g.beginPath(); g.arc(sp.x * sx, sp.y * sy, 4, 0, 7); g.fill(); }
     this.mapId = m.id;
@@ -50,7 +59,12 @@ export class Minimap {
     const g = this.g, sx = W / m.width, sy = H / m.depth;
     g.drawImage(this.bg, 0, 0);
     if (s) {
+      s.zones?.forEach((z, k) => { const zn = m.zones[k]; if (!zn || z.o === 0 && z.p < 0.02) return; g.fillStyle = z.o ? 'rgba(238,107,107,0.4)' : `rgba(238,107,107,${0.15 + z.p * 0.3})`; g.beginPath(); g.arc(zn.x * sx, zn.y * sy, zn.r * sx, 0, 7); g.fill(); });
       for (const u of s.units) {
+        if (u.type === 'wall' || u.type === 'gate' || u.type === 'tower') { // damaged / fallen pieces show as gaps via missing dots
+          if (u.hp < u.maxHp * 0.5) { g.fillStyle = '#ee6b6b'; g.fillRect(u.x * sx - 1.5, u.y * sy - 1.5, 3, 3); }
+          continue;
+        }
         if (u.type === 'castle') {
           g.fillStyle = '#4a94d9'; g.fillRect(u.x * sx - 5, u.y * sy - 5, 10, 10);
           g.strokeStyle = '#fff'; g.lineWidth = 1.5; g.strokeRect(u.x * sx - 5, u.y * sy - 5, 10, 10);

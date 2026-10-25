@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { UNIT_DEFS, type PlayerId, type UnitSnap, type UnitType } from '@burgwacht/shared';
+import { UNIT_DEFS, deckAt, deckHeight, isStructureType, rangedOnWall, type PlayerId, type UnitSnap, type UnitType } from '@burgwacht/shared';
 import { PAL } from './palette';
 import { loadBaked, type BakedModel, type Clip } from './baked';
 import { modelInstance } from './assets';
@@ -25,7 +25,7 @@ const FRAME_CAP = 96; // initial instances per frame bucket; grows on demand
 
 interface View {
   id: number; snap: UnitSnap; px: number; py: number; yaw: number;
-  walk: number; idle: number; attackT: number; flashT: number; spawnT: number; speed: number;
+  walk: number; idle: number; attackT: number; flashT: number; spawnT: number; speed: number; lift: number;
   obj?: THREE.Object3D;
 }
 interface Ghost { type: UnitType; owner: PlayerId | null; side: UnitSnap['side']; x: number; y: number; yaw: number; t: number; level: number }
@@ -151,11 +151,11 @@ export class UnitViews {
       seen.add(b.id);
       let v = this.views.get(b.id);
       if (!v) {
-        v = { id: b.id, snap: b, px: b.x, py: b.y, yaw: Math.PI / 2 - b.facing, walk: Math.random() * 8, idle: Math.random() * 4, attackT: 0, flashT: 0, spawnT: 0, speed: 0 };
+        v = { id: b.id, snap: b, px: b.x, py: b.y, yaw: Math.PI / 2 - b.facing, walk: Math.random() * 8, idle: Math.random() * 4, attackT: 0, flashT: 0, spawnT: 0, speed: 0, lift: 0 };
         this.views.set(b.id, v);
-        this.ensureModel(b.type);
+        if (!isStructureType(b.type)) this.ensureModel(b.type);
         const om = OBJECT_MODELS[b.type];
-        if (om) void modelInstance(om.file, om.size).then(o => {
+        if (om && !isStructureType(b.type)) void modelInstance(om.file, om.size).then(o => {
           if (!o || !this.views.has(b.id)) return;
           o.traverse(c => { if ((c as THREE.Mesh).isMesh) { (c as THREE.Mesh).castShadow = true; } });
           v!.obj = o; this.group.add(o);
@@ -181,6 +181,7 @@ export class UnitViews {
     const m = this.tmpM, q = this.tmpQ, s = this.tmpS, p = this.tmpP, col = this.tmpC;
     let nTeam = 0, nSel = 0, nBar = 0, nPip = 0;
     const camQ = this.world.camera.quaternion;
+    const crowns = [...this.views.values()].map(v => v.snap).filter(u => u.type === 'wall' || u.type === 'tower');
     const barScale = Math.min(3, Math.max(1, this.world.dist / 55));
 
     for (const v of this.views.values()) {
@@ -197,7 +198,12 @@ export class UnitViews {
       if (v.attackT > 0) v.attackT -= dt;
       if (v.flashT > 0) v.flashT -= dt;
       const sc = (SCALE[u.type] ?? 1) * (0.55 + 0.45 * v.spawnT);
-      const y = this.world.height(v.px, v.py);
+      const structure = isStructureType(u.type);
+      if (u.side === 'player' && u.owner !== null && rangedOnWall(u.type)) { // marksmen on a wall crown stand on top of it
+        const d = deckAt(crowns, v.px, v.py);
+        v.lift += ((d ? deckHeight(d.type) : 0) - v.lift) * Math.min(1, dt * 8);
+      }
+      const y = this.world.height(v.px, v.py) + v.lift;
       p.set(v.px, y, v.py);
 
       if (baked) {
@@ -216,7 +222,7 @@ export class UnitViews {
       }
 
       // team ring under every unit
-      if (nTeam < 1500) {
+      if (nTeam < 1500 && !structure) {
         const r = def.radius * 1.15 + 0.35;
         q.setFromAxisAngle(this.up, 0).premultiply(this.flat); s.set(r, r, 1);
         m.compose(p.clone().setY(y + 0.06), q, s);
@@ -225,7 +231,7 @@ export class UnitViews {
         nTeam++;
       }
       const sel = selected.has(u.id);
-      if (sel && nSel < 400) {
+      if (sel && nSel < 400 && !structure) {
         const r = (def.radius * 1.4 + 0.6) * (1 + Math.sin(this.t * 5) * 0.04);
         q.copy(this.flat); s.set(r, r, 1);
         m.compose(p.clone().setY(y + 0.1), q, s);
@@ -233,9 +239,9 @@ export class UnitViews {
         nSel++;
       }
       // health bar for hurt, selected or hovered units
-      if ((u.hp < u.maxHp || sel || this.hoverId === u.id) && nBar < 1000) {
-        const h = ((baked?.model.height ?? 3) * (SCALE[u.type] ?? 1)) + 0.7;
-        const w = (def.radius * 1.5 + 1.2) * barScale, th = 0.3 * barScale;
+      if ((u.hp < u.maxHp - 0.5 || (sel && !structure) || this.hoverId === u.id) && nBar < 1000) {
+        const h = structure ? deckHeight(u.type) + (u.type === 'gate' ? 3.4 : u.type === 'tower' ? 2.2 : 1.6) : ((baked?.model.height ?? 3) * (SCALE[u.type] ?? 1)) + 0.7;
+        const w = (structure ? def.radius * 1.3 : def.radius * 1.5 + 1.2) * barScale, th = (structure ? 0.5 : 0.3) * barScale;
         const f = Math.max(0, Math.min(1, u.hp / u.maxHp));
         const bp = new THREE.Vector3(v.px, y + h + (OBJECT_MODELS[u.type] ? 2 : 0), v.py);
         s.set(w, th, 1); m.compose(bp, camQ, s); this.barBg.setMatrixAt(nBar, m); this.barBg.setColorAt(nBar, this.tmpC.set(1, 1, 1));
