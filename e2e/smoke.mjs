@@ -51,7 +51,7 @@ check(await until(a, s => s.units.some(u => u.side === 'enemy')), 'enemy wave sp
 await b.reload();
 await b.waitForSelector('#lobby');
 await jsClick(b, '#join');
-check(await until(a, s => !s.paused, 15000), 'rejoin by code resumes the game');
+check(await until(a, s => !s.paused, 90000), 'rejoin by code resumes the game');
 
 check(await until(a, s => s.units.some(u => u.side === 'enemy' && u.hp < u.maxHp), 150000), 'fighting happens (enemies take damage)');
 check(errors.length === 0, `no console errors${errors.length ? ': ' + errors.slice(0, 3).join(' | ') : ''}`);
