@@ -64,7 +64,7 @@ wss.on('connection', (ws: WebSocket) => {
       if (!msg || typeof msg !== 'object') return err('bad_message');
       let room: Room | undefined | null;
       if (msg.t === 'create') {
-        room = rooms.create();
+        room = rooms.create(typeof msg.mapId === 'string' ? msg.mapId : undefined);
         if (!room) return err('server_full');
       } else if (msg.t === 'join') {
         room = typeof msg.code === 'string' ? rooms.get(msg.code) : undefined;

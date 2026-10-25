@@ -35,6 +35,6 @@ export const ENEMIES: Record<EnemyType, UnitDef> = {
 };
 
 export const CASTLE_DEF: UnitDef = {
-  name: 'Burg', hp: 2400, armor: 'structure', armorValue: 30, damage: 7, damageKind: 'pierce',
-  range: 17, speed: 0, cost: 0, morale: 100, cooldown: 0.9, radius: 7,
+  name: 'Burg', hp: 5000, armor: 'structure', armorValue: 30, damage: 9, damageKind: 'pierce',
+  range: 19, speed: 0, cost: 0, morale: 100, cooldown: 0.7, radius: 8.5,
 };

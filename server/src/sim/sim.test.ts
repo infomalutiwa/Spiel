@@ -146,20 +146,20 @@ describe('special troops', () => {
 describe('orders', () => {
   it('buy checks gold, zone and phase; spends gold', () => {
     const s = createGame('meadow', 1);
-    expect(applyCommand(s, 0, { c: 'buy', troop: 'knight', x: 40, y: 40 })).toEqual({ ok: true });
+    expect(applyCommand(s, 0, { c: 'buy', troop: 'knight', x: 60, y: 60 })).toEqual({ ok: true });
     expect(s.players[0].gold).toBe(START_GOLD - UNIT_DEFS.knight.cost);
     const g = s.players[0].gold, n = s.units.length;
-    expect(applyCommand(s, 0, { c: 'buy', troop: 'catapult', x: 40, y: 40 }).ok).toBe(g >= 180);
+    expect(applyCommand(s, 0, { c: 'buy', troop: 'catapult', x: 60, y: 60 }).ok).toBe(g >= 180);
     s.units.length = n; s.players[0].gold = 10;
-    const r = applyCommand(s, 0, { c: 'buy', troop: 'knight', x: 40, y: 40 });
+    const r = applyCommand(s, 0, { c: 'buy', troop: 'knight', x: 60, y: 60 });
     expect(r).toEqual({ ok: false, reason: 'not_enough_gold' });
     expect(s.players[0].gold).toBe(10);
     s.players[0].gold = 500;
     expect(applyCommand(s, 0, { c: 'buy', troop: 'knight', x: 5, y: 5 })).toEqual({ ok: false, reason: 'outside_zone' });
-    expect(applyCommand(s, 0, { c: 'buy', troop: 'nope' as never, x: 40, y: 40 }).ok).toBe(false);
-    expect(applyCommand(s, 0, { c: 'buy', troop: 'knight', x: NaN, y: 40 }).ok).toBe(false);
+    expect(applyCommand(s, 0, { c: 'buy', troop: 'nope' as never, x: 60, y: 60 }).ok).toBe(false);
+    expect(applyCommand(s, 0, { c: 'buy', troop: 'knight', x: NaN, y: 60 }).ok).toBe(false);
     s.phase = 'battle';
-    expect(applyCommand(s, 0, { c: 'buy', troop: 'knight', x: 40, y: 40 })).toEqual({ ok: false, reason: 'not_prep' });
+    expect(applyCommand(s, 0, { c: 'buy', troop: 'knight', x: 60, y: 60 })).toEqual({ ok: false, reason: 'not_prep' });
   });
   it('rejects orders for units the player does not own, changing nothing', () => {
     const s = battle();
@@ -194,15 +194,15 @@ describe('orders', () => {
     expect(k.x).toBeCloseTo(60, 0);
     applyCommand(s, 0, { c: 'retreat', ids: [k.id] });
     run(s, 25);
-    expect(k.x).toBeLessThan(35);
+    expect(k.x).toBeLessThan(45);
   });
   it('placement only in prep and inside the zone', () => {
     const s = createGame('meadow', 1);
-    applyCommand(s, 0, { c: 'buy', troop: 'knight', x: 40, y: 40 });
+    applyCommand(s, 0, { c: 'buy', troop: 'knight', x: 60, y: 60 });
     const u = s.units.find(x => x.type === 'knight')!;
-    expect(applyCommand(s, 0, { c: 'place', ids: [u.id], x: 50, y: 30 }).ok).toBe(true);
-    expect(u.x).toBeGreaterThan(45);
-    expect(applyCommand(s, 0, { c: 'place', ids: [u.id], x: 100, y: 30 })).toEqual({ ok: false, reason: 'outside_zone' });
+    expect(applyCommand(s, 0, { c: 'place', ids: [u.id], x: 70, y: 60 }).ok).toBe(true);
+    expect(u.x).toBeGreaterThan(60);
+    expect(applyCommand(s, 0, { c: 'place', ids: [u.id], x: 200, y: 30 })).toEqual({ ok: false, reason: 'outside_zone' });
   });
 });
 
@@ -215,10 +215,13 @@ describe('waves and phases', () => {
     applyCommand(s, 1, { c: 'ready', ready: true });
     tick(s);
     expect(s.phase).toBe('battle');
-    const total = WAVES[0].groups.reduce((a, g) => a + g.count, 0);
-    run(s, 8);
-    expect(s.units.filter(u => u.side === 'enemy').length + (total - s.spawnQueue.length - s.units.filter(u => u.side === 'enemy').length)).toBe(total);
+    const total = WAVES[0].groups.reduce((a, g) => a + Math.max(1, Math.round(g.count * MAPS.meadow.waveScale)), 0);
+    expect(s.spawnQueue.length).toBe(total);
+    run(s, 16);
     expect(s.spawnQueue.length).toBe(0);
+    expect(s.units.filter(u => u.side === 'enemy').length).toBeGreaterThan(0);
+    const spawnPoints = MAPS.meadow.spawns;
+    for (const e of s.units.filter(u => u.side === 'enemy')) expect(e.x).toBeGreaterThan(spawnPoints[0].x - 200);
   });
   it('starts the battle when the prep timer ends', () => {
     const s = createGame('meadow', 1);
@@ -252,7 +255,7 @@ describe('waves and phases', () => {
     const play = () => {
       const s = createGame('meadow', 42);
       const cmds: Command[] = [
-        { c: 'buy', troop: 'knight', x: 40, y: 40 }, { c: 'buy', troop: 'archer', x: 36, y: 44 },
+        { c: 'buy', troop: 'knight', x: 60, y: 60 }, { c: 'buy', troop: 'archer', x: 36, y: 44 },
         { c: 'ready', ready: true },
       ];
       cmds.forEach(c => applyCommand(s, 0, c));

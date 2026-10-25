@@ -23,7 +23,7 @@ export function createGame(mapId: string, seed: number): GameState {
   if (!map) throw new Error(`unknown map ${mapId}`);
   const s: GameState = {
     mapId, tick: 0, time: 0, rng: seed >>> 0, nextId: 1, phase: 'prep', timer: PREP_TIME,
-    wave: 0, players: [newPlayer(), newPlayer()], units: [], spawnQueue: [], battleTime: 0, events: [],
+    wave: 0, players: [newPlayer(), newPlayer()], units: [], spawnQueue: [], battleTime: 0, lastSpawn: 0, events: [],
   };
   const castle = spawnUnit(s, 'player', null, 'castle', map.castle.x, map.castle.y);
   castle.hp = castle.maxHp = CASTLE_DEF.hp;

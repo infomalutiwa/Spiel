@@ -1,5 +1,6 @@
 import { MAPS, UNIT_DEFS, type GameState, type Unit } from '@burgwacht/shared';
 import { castleOf, rand } from './state';
+import { gridOf } from './grid';
 
 /** walk u toward (gx,gy) by up to speed*dt; returns true once arrived */
 export function moveToward(u: Unit, gx: number, gy: number, dt: number, speedMul = 1): boolean {
@@ -39,17 +40,17 @@ export function stepMovement(s: GameState, dt: number): void {
 /** keep units from stacking and inside the map; the castle never moves */
 export function separate(s: GameState): void {
   const map = MAPS[s.mapId];
-  const us = s.units;
-  for (let i = 0; i < us.length; i++) {
-    const a = us[i];
+  const grid = gridOf(s);
+  grid.rebuild(s.units);
+  for (const a of s.units) {
     if (a.hp <= 0) continue;
-    for (let j = i + 1; j < us.length; j++) {
-      const b = us[j];
-      if (b.hp <= 0) continue;
-      const min = (UNIT_DEFS[a.type].radius + UNIT_DEFS[b.type].radius) * 0.75;
+    const ra = UNIT_DEFS[a.type].radius;
+    grid.near(a.x, a.y, ra + 3.5, b => {
+      if (b.id <= a.id || b.hp <= 0) return; // each pair once, in id order
+      const min = (ra + UNIT_DEFS[b.type].radius) * 0.75;
       let dx = b.x - a.x, dy = b.y - a.y;
       let d = Math.hypot(dx, dy);
-      if (d >= min) continue;
+      if (d >= min) return;
       if (d < 1e-4) {
         const ang = rand(s) * Math.PI * 2;
         dx = Math.cos(ang); dy = Math.sin(ang); d = 1;
@@ -60,9 +61,9 @@ export function separate(s: GameState): void {
       const wa = aFixed ? 0 : bFixed ? 1 : 0.5, wb = bFixed ? 0 : aFixed ? 1 : 0.5;
       a.x -= nx * push * wa; a.y -= ny * push * wa;
       b.x += nx * push * wb; b.y += ny * push * wb;
-    }
+    });
   }
-  for (const u of us) {
+  for (const u of s.units) {
     u.x = Math.min(map.width - 1, Math.max(1, u.x));
     u.y = Math.min(map.depth - 1, Math.max(1, u.y));
   }

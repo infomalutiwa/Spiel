@@ -101,6 +101,8 @@ export interface GameState {
   units: Unit[];
   spawnQueue: SpawnItem[];
   battleTime: number;
+  /** battleTime of the most recent enemy spawn */
+  lastSpawn: number;
   events: GameEvent[];
 }
 
@@ -114,16 +116,22 @@ export type Command =
   | { c: 'ability'; id: AbilityId; x: number; y: number }
   | { c: 'ready'; ready: boolean };
 
+export type MapTheme = 'meadow' | 'forest' | 'valley';
+
 export interface MapDef {
   id: string;
   name: string;
+  blurb: string;
   width: number;
   depth: number;
   castle: Vec2;
-  spawnX: number;
-  lanes: number[];
+  /** where enemy waves enter; a wave group's `lane` indexes this list */
+  spawns: Vec2[];
   placeZone: { x0: number; x1: number; y0: number; y1: number };
+  theme: MapTheme;
   decorSeed: number;
+  /** multiplier on enemy counts per wave */
+  waveScale: number;
 }
 
 export interface WaveGroup { type: EnemyType; count: number; lane: number; delay?: number }
@@ -133,7 +141,7 @@ export type Result = { ok: true } | { ok: false; reason: string };
 
 /* ---- network protocol ---- */
 export type ClientMsg =
-  | { t: 'create' }
+  | { t: 'create'; mapId?: string }
   | { t: 'join'; code: string; token?: string }
   | { t: 'cmd'; cmd: Command };
 
@@ -144,12 +152,15 @@ export interface UnitSnap {
 export interface Snapshot {
   tick: number; time: number; phase: Phase; timer: number; wave: number; waveCount: number;
   players: [PlayerState, PlayerState];
+  /** decoded unit list (on the wire: base64 in `u`, see codec.ts) */
   units: UnitSnap[];
   events: GameEvent[];
   paused: boolean;
 }
+/** the snapshot as sent over the wire */
+export type WireSnapshot = Omit<Snapshot, 'units'> & { u: string };
 export type ServerMsg =
   | { t: 'joined'; code: string; you: PlayerId; token: string; mapId: string }
   | { t: 'error'; reason: string }
-  | { t: 'snap'; s: Snapshot }
+  | { t: 'snap'; s: WireSnapshot }
   | { t: 'peer'; connected: boolean };

@@ -4,6 +4,7 @@ import {
 } from '@burgwacht/shared';
 import { castAbility } from './abilities';
 import { castleOf, getUnit, spawnUnit } from './state';
+import { MAX_ARMY } from '@burgwacht/shared';
 
 /** one slot per unit (same order as input). Short-ranged, tougher units take the front rows. */
 export function formationSlots(units: Unit[], f: Formation, center: Vec2, facing: number): Vec2[] {
@@ -72,6 +73,7 @@ export function applyCommand(s: GameState, player: PlayerId, c: Command): Result
       const def = TROOPS[c.troop];
       if (!finite(c.x, c.y)) return fail('bad_command');
       if (def.cost > me.gold) return fail('not_enough_gold');
+      if (s.units.filter(u => u.owner === player).length >= MAX_ARMY) return fail('army_full');
       if (!inZone(s, c.x, c.y)) return fail('outside_zone');
       me.gold -= def.cost;
       spawnUnit(s, 'player', player, c.troop, c.x, c.y);

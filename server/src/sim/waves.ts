@@ -12,9 +12,15 @@ function startBattle(s: GameState) {
   const wave = WAVES[s.wave];
   s.spawnQueue = [];
   s.battleTime = 0;
-  for (const g of wave.groups)
-    for (let i = 0; i < g.count; i++)
-      s.spawnQueue.push({ at: (g.delay ?? 0) + i * 0.55, type: g.type, lane: g.lane });
+  s.lastSpawn = 0;
+  const scale = MAPS[s.mapId].waveScale;
+  for (const g of wave.groups) {
+    const n = Math.max(1, Math.round(g.count * scale));
+    // big groups arrive in a stream, not a lump: the whole group takes ~14 s to file in
+    const gap = Math.min(0.55, 14 / n);
+    for (let i = 0; i < n; i++)
+      s.spawnQueue.push({ at: (g.delay ?? 0) + i * gap, type: g.type, lane: g.lane });
+  }
   s.spawnQueue.sort((a, b) => a.at - b.at);
   for (const p of s.players) p.ready = false;
   setPhase(s, 'battle');
@@ -51,10 +57,13 @@ export function stepWaves(s: GameState, dt: number): void {
   s.battleTime += dt;
   while (s.spawnQueue.length && s.spawnQueue[0].at <= s.battleTime) {
     const it = s.spawnQueue.shift()!;
-    const y = map.lanes[it.lane] + (rand(s) - 0.5) * 5;
-    const u = spawnUnit(s, 'enemy', null, it.type, map.spawnX + rand(s) * 3, y, it.lane);
-    u.order = { kind: 'attackMove', x: castle.x + 6, y: castle.y + (y - castle.y) * 0.25 };
-    u.maxHp = u.hp = ENEMIES[it.type].hp;
+    const sp = map.spawns[it.lane % map.spawns.length];
+    const u = spawnUnit(s, 'enemy', null, it.type, sp.x + (rand(s) - 0.5) * 9, sp.y + (rand(s) - 0.5) * 9, it.lane);
+    u.order = { kind: 'attackMove', x: castle.x, y: castle.y };
+    // later waves arrive battle-hardened: tougher and harder-hitting (stars over their heads)
+    u.level = 1 + Math.min(2, Math.floor(s.wave / 4));
+    u.maxHp = u.hp = ENEMIES[it.type].hp * (1 + 0.15 * (u.level - 1));
+    s.lastSpawn = s.battleTime;
   }
   if (!s.spawnQueue.length && !s.units.some(u => u.side === 'enemy' && u.hp > 0)) endBattle(s);
 }

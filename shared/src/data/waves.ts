@@ -27,9 +27,20 @@ export const WAVES: WaveDef[] = [
     { type: 'brute', count: 3, lane: 1 }, { type: 'raider_rider', count: 8, lane: 0, delay: 3 },
     { type: 'ram', count: 3, lane: 2, delay: 2 }, { type: 'footman', count: 16, lane: 1, delay: 4 },
     { type: 'shaman', count: 3, lane: 1, delay: 6 }, { type: 'raider_archer', count: 10, lane: 2, delay: 5 }] },
+  { name: 'Die Horde', groups: [
+    { type: 'footman', count: 14, lane: 0 }, { type: 'footman', count: 14, lane: 1, delay: 2 },
+    { type: 'raider_rider', count: 9, lane: 2, delay: 3 }, { type: 'raider_archer', count: 12, lane: 3, delay: 2 },
+    { type: 'shaman', count: 3, lane: 1, delay: 5 }, { type: 'ram', count: 3, lane: 0, delay: 4 }] },
+  { name: 'Der letzte Sturm', groups: [
+    { type: 'brute', count: 4, lane: 1 }, { type: 'brute', count: 2, lane: 3, delay: 6 },
+    { type: 'footman', count: 18, lane: 0, delay: 2 }, { type: 'raider_rider', count: 10, lane: 2, delay: 4 },
+    { type: 'ram', count: 4, lane: 1, delay: 3 }, { type: 'raider_catapult', count: 3, lane: 3, delay: 5 },
+    { type: 'shaman', count: 4, lane: 0, delay: 6 }, { type: 'raider_archer', count: 14, lane: 2, delay: 6 }] },
 ];
 
 /** gold both players receive after clearing wave index w */
-export const waveReward = (w: number) => 160 + w * 32;
-export const START_GOLD = 360;
+export const waveReward = (w: number) => 420 + w * 90;
+export const START_GOLD = 1100;
+/** hard cap per player so the sim and the renderer stay smooth */
+export const MAX_ARMY = 160;
 export const PREP_TIME = 40;

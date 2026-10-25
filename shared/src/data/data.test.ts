@@ -25,10 +25,31 @@ describe('data tables', () => {
       expect(Object.keys(row).sort()).toEqual(['heavy', 'light', 'mounted', 'siege', 'structure']);
   });
   it('waves reference existing enemies and lanes', () => {
-    const lanes = MAPS.meadow.lanes.length;
     for (const w of WAVES) for (const g of w.groups) {
       expect(ENEMIES[g.type]).toBeDefined();
-      expect(g.lane).toBeLessThan(lanes);
+      expect(g.lane).toBeGreaterThanOrEqual(0);
+      expect(g.count).toBeGreaterThan(0);
+    }
+  });
+  it('maps are self-consistent: everything inside bounds, spawns far from the build zone', () => {
+    expect(Object.keys(MAPS).length).toBeGreaterThanOrEqual(3);
+    for (const m of Object.values(MAPS)) {
+      expect(m.spawns.length).toBeGreaterThanOrEqual(3);
+      const inside = (p: { x: number; y: number }) => p.x > 0 && p.x < m.width && p.y > 0 && p.y < m.depth;
+      expect(inside(m.castle)).toBe(true);
+      m.spawns.forEach(sp => {
+        expect(inside(sp)).toBe(true);
+        expect(Math.hypot(sp.x - m.castle.x, sp.y - m.castle.y)).toBeGreaterThan(80);
+        const z = m.placeZone;
+        const dx = Math.max(z.x0 - sp.x, 0, sp.x - z.x1), dy = Math.max(z.y0 - sp.y, 0, sp.y - z.y1);
+        expect(Math.hypot(dx, dy)).toBeGreaterThan(40);
+      });
+      const z = m.placeZone;
+      expect(z.x0).toBeGreaterThanOrEqual(0); expect(z.x1).toBeLessThanOrEqual(m.width);
+      expect(z.y0).toBeGreaterThanOrEqual(0); expect(z.y1).toBeLessThanOrEqual(m.depth);
+      // the build zone must not swallow the castle itself
+      expect(m.castle.x < z.x0 - 8 || m.castle.x > z.x1 + 8 || m.castle.y < z.y0 - 8 || m.castle.y > z.y1 + 8
+        || Math.hypot(Math.max(z.x0 - m.castle.x, 0, m.castle.x - z.x1), Math.max(z.y0 - m.castle.y, 0, m.castle.y - z.y1)) > 8).toBe(true);
     }
   });
 });

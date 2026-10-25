@@ -1,8 +1,9 @@
 import {
   DAMAGE_VS_ARMOR, UNIT_DEFS, type GameState, type PlayerId, type Unit,
 } from '@burgwacht/shared';
-import { edgeDist, getUnit, pushEvent } from './state';
+import { castleOf, edgeDist, getUnit, pushEvent } from './state';
 import { castlePos, moveToward } from './movement';
+import { gridOf } from './grid';
 
 const aggroOf = (u: Unit) => Math.max(UNIT_DEFS[u.type].range + 3, 9);
 
@@ -15,6 +16,10 @@ export function resolveDamage(attacker: Unit, target: Unit): number {
   const raw = a.damage * mult * (1 + 0.12 * (attacker.level - 1)) * (1 + attacker.buff);
   return Math.max(1, (raw * 100) / (100 + armor));
 }
+
+/** enemies that have been on the field a long time with the spawner empty go berserk */
+const frenzied = (s: GameState, u: Unit) =>
+  u.side === 'enemy' && s.spawnQueue.length === 0 && s.battleTime - s.lastSpawn > 60;
 
 const XP_FOR_LEVEL = [0, 3, 8];
 
@@ -40,11 +45,11 @@ export function applyDamage(s: GameState, credit: Credit, victim: Unit, amt: num
       pushEvent(s, { k: 'level', x: k.x, y: k.y });
     }
   }
-  for (const o of s.units) {
-    if (o.hp <= 0 || o.side !== victim.side || o.type === 'castle') continue;
+  gridOf(s).near(victim.x, victim.y, 7, o => {
+    if (o.hp <= 0 || o.side !== victim.side || o.type === 'castle') return;
     if (Math.hypot(o.x - victim.x, o.y - victim.y) < 7)
       o.morale -= (7 * 100) / UNIT_DEFS[o.type].morale;
-  }
+  });
 }
 
 /** best target for u within `reach` (edge distance); preferred armor kinds first, else nearest */
@@ -52,13 +57,13 @@ export function pickTarget(s: GameState, u: Unit, reach: number): Unit | undefin
   const def = UNIT_DEFS[u.type];
   let best: Unit | undefined, bestD = Infinity;
   let pref: Unit | undefined, prefD = Infinity;
-  for (const o of s.units) {
-    if (o.hp <= 0 || o.side === u.side) continue;
+  gridOf(s).near(u.x, u.y, reach + 10, o => { // +10 covers the largest unit radius (castle 8.5)
+    if (o.hp <= 0 || o.side === u.side) return;
     const d = edgeDist(u, o);
-    if (d > reach) continue;
-    if (d < bestD) { best = o; bestD = d; }
-    if (def.prefers?.includes(UNIT_DEFS[o.type].armor) && d < prefD) { pref = o; prefD = d; }
-  }
+    if (d > reach) return;
+    if (d < bestD || (d === bestD && best && o.id < best.id)) { best = o; bestD = d; }
+    if (def.prefers?.includes(UNIT_DEFS[o.type].armor) && (d < prefD || (d === prefD && pref && o.id < pref.id))) { pref = o; prefD = d; }
+  });
   return pref ?? best;
 }
 
@@ -71,9 +76,11 @@ function attack(s: GameState, u: Unit, t: Unit): void {
   pushEvent(s, { k: 'shot', from: u.id, to: t.id, x: u.x, y: u.y, tx: t.x, ty: t.y, kind: def.damageKind });
   if (def.special === 'aoe' && def.areaRadius) {
     pushEvent(s, { k: 'aoe', x: t.x, y: t.y, r: def.areaRadius, kind: def.damageKind === 'siege' ? 'siege' : 'magic' });
-    for (const v of s.units) {
-      if (v.hp <= 0 || v.side === u.side) continue;
-      const d = Math.hypot(v.x - t.x, v.y - t.y);
+    const victims: Unit[] = []; // collect first: applyDamage may touch the grid's neighbours
+    gridOf(s).near(t.x, t.y, def.areaRadius + 9, v => { if (v.hp > 0 && v.side !== u.side) victims.push(v); });
+    victims.sort((a, b) => a.id - b.id); // iteration order must not depend on hash layout (determinism)
+    for (const v of victims) {
+      const d = Math.hypot(v.x - t.x, v.y - t.y) - UNIT_DEFS[v.type].radius * 0;
       if (d > def.areaRadius) continue;
       applyDamage(s, credit, v, resolveDamage(u, v) * (1 - 0.4 * (d / def.areaRadius)));
     }
@@ -90,7 +97,14 @@ export function stepCombat(s: GameState, dt: number): void {
     if (u.anim === 2 && u.cd < def.cooldown - 0.35) u.anim = 0;
     if (u.routed > 0 || def.special === 'heal') continue; // routed: abilities.ts; healers: abilities.ts
     if (u.order.kind === 'move' || u.order.kind === 'retreat') continue;
-    if (def.damage <= 0 && def.special !== 'buff') continue;
+    if (def.damage <= 0 && def.special !== 'buff') { if (!frenzied(s, u)) continue; }
+
+    if (frenzied(s, u) && u.type !== 'castle') { // nobody left to reinforce: stop sniping from afar and rush the castle, so waves always end
+      const castle = castleOf(s);
+      if (def.damage > 0) { const tt = pickTarget(s, u, def.range); if (tt && u.cd <= 0) attack(s, u, tt); }
+      if (castle && edgeDist(u, castle) > def.range * 0.9) moveToward(u, castle.x, castle.y, dt);
+      continue;
+    }
 
     const hold = u.order.kind === 'hold' || u.type === 'castle';
     const reach = hold ? def.range : aggroOf(u);

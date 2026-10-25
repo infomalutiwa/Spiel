@@ -1,5 +1,5 @@
 import {
-  DEFAULT_MAP, WAVES, type ClientMsg, type PlayerId, type ServerMsg, type Snapshot,
+  DEFAULT_MAP, MAPS, WAVES, toWire, type ClientMsg, type PlayerId, type ServerMsg, type Snapshot,
 } from '@burgwacht/shared';
 import { applyCommand, createGame, tick } from '../sim';
 import type { GameState } from '@burgwacht/shared';
@@ -18,8 +18,8 @@ export class Room {
   private timer?: ReturnType<typeof setInterval>;
   private everFull = false;
 
-  constructor(public code: string, seed = (Math.random() * 2 ** 32) >>> 0) {
-    this.state = createGame(DEFAULT_MAP, seed);
+  constructor(public code: string, seed = (Math.random() * 2 ** 32) >>> 0, mapId = DEFAULT_MAP) {
+    this.state = createGame(Object.hasOwn(MAPS, mapId) ? mapId : DEFAULT_MAP, seed);
     this.tokens = [token(), token()];
   }
 
@@ -101,7 +101,7 @@ export class Room {
   }
 
   private sendSnapshot() {
-    this.broadcast({ t: 'snap', s: this.snapshot() });
+    this.broadcast({ t: 'snap', s: toWire(this.snapshot()) });
   }
   private broadcast(m: ServerMsg) { for (const ws of this.sockets) if (ws) this.send(ws, m); }
   private send(ws: Socket | null, m: ServerMsg) { try { ws?.send(JSON.stringify(m)); } catch { /* socket gone */ } }
@@ -117,13 +117,13 @@ export class RoomRegistry {
   readonly createdAt = new WeakMap<Room, number>();
 
   /** null when the server is full */
-  create(): Room | null {
+  create(mapId?: string): Room | null {
     this.sweep();
     if (this.rooms.size >= MAX_ROOMS) return null;
     let code: string;
     do { code = Array.from({ length: 4 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join(''); }
     while (this.rooms.has(code));
-    const room = new Room(code);
+    const room = new Room(code, undefined, mapId);
     room.start();
     this.rooms.set(code, room);
     this.createdAt.set(room, Date.now());
