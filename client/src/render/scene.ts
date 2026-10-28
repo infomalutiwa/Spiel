@@ -29,6 +29,9 @@ interface Look { a: string; b: string; dry: string; path: string; edge: string; 
 const LOOKS: Record<MapTheme, Look> = {
   meadow: { a: '#93c76c', b: '#7db860', dry: '#bccb72', path: '#dcbd8f', edge: '#c9a574', fog: '#f5d9b4', sun: '#ffd9a0', sunI: 2.7, exposure: 1.08, skyTop: '#8fc4e8', skyMid: '#f8e1b8', skyLow: '#ffd1a1' },
   forest: { a: '#74b45c', b: '#5f9e50', dry: '#a5b862', path: '#cfb48b', edge: '#b99a6c', fog: '#dfe2b4', sun: '#ffe3ae', sunI: 2.5, exposure: 1.02, skyTop: '#86bde0', skyMid: '#e9e8bd', skyLow: '#f6dca6' },
+  snow: { a: '#e9f1f7', b: '#d6e4ee', dry: '#c6d6e2', path: '#cdbfae', edge: '#b4a898', fog: '#dce9f4', sun: '#fff0d8', sunI: 2.5, exposure: 1.12, skyTop: '#9dc2e6', skyMid: '#e8f0f8', skyLow: '#f6e8dc' },
+  desert: { a: '#e6c887', b: '#d8b472', dry: '#c99f5e', path: '#ecd7a6', edge: '#cfae72', fog: '#f8dfb0', sun: '#ffd28a', sunI: 3.0, exposure: 1.12, skyTop: '#7fb4e2', skyMid: '#fbe3b8', skyLow: '#ffc788' },
+  ridge: { a: '#9aa66c', b: '#838f5c', dry: '#a99a72', path: '#cdb48c', edge: '#a8906a', fog: '#e8d4b8', sun: '#ffcf9a', sunI: 2.6, exposure: 1.05, skyTop: '#86a8d0', skyMid: '#f0d8b4', skyLow: '#f5bf92' },
   valley: { a: '#a8c862', b: '#92b858', dry: '#d9bb68', path: '#e1c18e', edge: '#cba670', fog: '#f7d3a8', sun: '#ffc990', sunI: 2.8, exposure: 1.1, skyTop: '#92b8e0', skyMid: '#fadcb0', skyLow: '#ffc08c' },
 };
 
@@ -164,7 +167,7 @@ export class World {
     const m = this.map;
     const dx = Math.max(-x, 0, x - m.width), dz = Math.max(-z, 0, z - m.depth);
     const out = Math.hypot(dx, dz);
-    const amp = m.theme === 'valley' ? 22 : m.theme === 'forest' ? 11 : 9;
+    const amp = m.theme === 'valley' || m.theme === 'ridge' ? 22 : m.theme === 'forest' ? 11 : m.theme === 'desert' ? 5 : 9;
     return (noise2(x * 0.03, z * 0.03) * amp + noise2(x * 0.1, z * 0.1) * 2) * smooth(2, 50, out);
   }
 
@@ -276,7 +279,7 @@ export class World {
     const nearCastle = (x: number, z: number, r: number) => Math.hypot(x - m.castle.x, z - m.castle.y) < r;
     const inZone = (x: number, z: number) => { const zn = m.placeZone; return x > zn.x0 - 4 && x < zn.x1 + 4 && z > zn.y0 - 4 && z < zn.y1 + 4; };
 
-    const dense = m.theme === 'forest' ? 2.6 : m.theme === 'valley' ? 1.2 : 1;
+    const dense = m.theme === 'forest' ? 2.6 : m.theme === 'valley' || m.theme === 'ridge' ? 1.2 : m.theme === 'desert' ? 0.25 : m.theme === 'snow' ? 1.6 : 1;
     // framing: forests and mountains beyond the rim
     const rimOk = (x: number, z: number) => outside(x, z, 6);
     const clumps = ['hex/trees_A_large', 'hex/trees_B_large', 'hex/trees_A_medium', 'hex/trees_B_medium'];

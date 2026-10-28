@@ -225,7 +225,7 @@ export type Command =
   | { c: 'ability'; id: AbilityId; x: number; y: number }
   | { c: 'ready'; ready: boolean };
 
-export type MapTheme = 'meadow' | 'forest' | 'valley';
+export type MapTheme = 'meadow' | 'forest' | 'valley' | 'snow' | 'desert' | 'ridge';
 
 export interface Rect { x0: number; x1: number; y0: number; y1: number }
 /** one wall segment, gate or tower; walls run north–south, the enemy comes from the east */

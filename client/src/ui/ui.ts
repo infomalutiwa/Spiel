@@ -36,6 +36,7 @@ export interface LobbyHandlers { create(mapId: string, endless: boolean): Promis
 
 const SWATCH: Record<string, string> = {
   meadow: 'linear-gradient(135deg,#9fd078,#7db860 55%,#e0bd8b)', forest: 'linear-gradient(135deg,#5f9e50,#3f7d3f 55%,#c9ad84)', valley: 'linear-gradient(135deg,#d9bb68,#a8c862 55%,#e1c18e)',
+  frost: 'linear-gradient(135deg,#f4f9fd,#c4d8e8 55%,#b4a898)', oasis: 'linear-gradient(135deg,#f0d89a,#d8b472 55%,#5fa86a)', ridge: 'linear-gradient(135deg,#a2ae72,#7c8a58 55%,#cdb48c)',
 };
 
 export class Ui {

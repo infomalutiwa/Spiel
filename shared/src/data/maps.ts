@@ -78,5 +78,41 @@ export const MAPS: Record<string, MapDef> = {
     ],
     spawnYs: [62, 98], decorSeed: 33, waveScale: 2.0,
   }),
+  frost: fortress({
+    id: 'frost', name: 'Eistal', theme: 'snow',
+    blurb: 'Enges, verschneites Tal: Die Tore liegen an den Rändern, Angreifer müssen quer durch den Schusshagel.',
+    width: 300, depth: 100, keep: 26,
+    outer: { x: 196, gateY: 16 }, inner: { x: 104, gateY: 84 }, towerEvery: 4,
+    zones: [
+      { name: 'Eispass', x: 150, y: 50, r: 30 },
+      { name: 'Schneehof', x: 76, y: 50, r: 18 },
+      { name: 'Thronvorplatz', x: 47, y: 50, r: 10 },
+    ],
+    spawnYs: [30, 70], decorSeed: 45, waveScale: 1.85,
+  }),
+  oasis: fortress({
+    id: 'oasis', name: 'Wüstenoase', theme: 'desert',
+    blurb: 'Weite, offene Höfe und drei Angriffsrichtungen – viel Platz zum Bauen.',
+    width: 340, depth: 150, keep: 30,
+    outer: { x: 222, gateY: 75 }, inner: { x: 114, gateY: 75 }, towerEvery: 2,
+    zones: [
+      { name: 'Karawanserei', x: 168, y: 75, r: 36 },
+      { name: 'Oase', x: 82, y: 75, r: 22 },
+      { name: 'Thronvorplatz', x: 52, y: 75, r: 11 },
+    ],
+    spawnYs: [38, 75, 112], decorSeed: 57, waveScale: 2.05,
+  }),
+  ridge: fortress({
+    id: 'ridge', name: 'Bergpfad', theme: 'ridge',
+    blurb: 'Der Aufstieg zur Burg: Die Tore sitzen an den entgegengesetzten Enden – ein langer Zickzackweg nach oben.',
+    width: 320, depth: 170, keep: 28,
+    outer: { x: 206, gateY: 150 }, inner: { x: 108, gateY: 20 }, towerEvery: 3,
+    zones: [
+      { name: 'Serpentine', x: 156, y: 90, r: 34 },
+      { name: 'Burgtor', x: 78, y: 70, r: 20 },
+      { name: 'Thronvorplatz', x: 50, y: 85, r: 11 },
+    ],
+    spawnYs: [120, 150], decorSeed: 71, waveScale: 2.15,
+  }),
 };
 export const DEFAULT_MAP = 'meadow';

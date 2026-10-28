@@ -1,7 +1,7 @@
 import type { Snapshot } from '@burgwacht/shared';
 import type { World } from '../render/scene';
 
-const THEME_BG: Record<string, string> = { meadow: '#8fc46a', forest: '#6aa957', valley: '#b2c262' };
+const THEME_BG: Record<string, string> = { meadow: '#8fc46a', forest: '#6aa957', valley: '#b2c262', snow: '#dbe8f1', desert: '#e0c283', ridge: '#8f9c64' };
 
 /** corner map: terrain, roads, castle, units and the camera's view; click or drag to jump */
 export class Minimap {
