@@ -252,10 +252,10 @@ export class UnitViews {
           const hh = (baked.model.height ?? 3) * sc;
           const fx = Math.sin(v.yaw), fz = Math.cos(v.yaw);
           q.setFromAxisAngle(this.up, v.yaw); const tilt = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -0.18 - (moving ? 0.15 : 0));
-          q.multiply(tilt); s.set(sc * 0.9, sc * 0.9, sc * 0.9);
+          q.multiply(tilt); s.set(sc * 1.25, sc * 1.2, sc * 1.2);
           m.compose(this.tmpP2.set(v.px - fx * 0.32 * sc, y + hh * 0.5, v.py - fz * 0.32 * sc), q, s);
           this.capes.setMatrixAt(nCape, m); this.capes.setColorAt(nCape, BRANCH_CAPE[u.branch] ?? BRANCH_CAPE[0]);
-          q.setFromAxisAngle(this.up, 0); s.setScalar(sc * (u.level >= 3 ? 1.25 : 0.95));
+          q.setFromAxisAngle(this.up, 0); s.setScalar(sc * (u.level >= 3 ? 1.5 : 1.15));
           m.compose(this.tmpP2.set(v.px, y + hh * 0.97, v.py), q, s);
           this.plumes.setMatrixAt(nCape, m); this.plumes.setColorAt(nCape, u.level >= 3 ? PLUME_GOLD : PLUME_SILVER);
           nCape++;
