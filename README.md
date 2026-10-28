@@ -108,3 +108,7 @@ Die Truppen und Gegner sind animierte Figuren aus den KayKit-Paketen *Adventurer
 ## Wie es weitergeht (Stufen 3–5 der Spec)
 
 Gegnerfraktionen und Bosse, Gelände-Boni, Wetter/Nacht, Upgrade-Baum, Charaktere, Sound und Musik.
+
+## Tag und Nacht
+
+Mit jeder Welle wird es dunkler (Abend → Nacht): Sterne, Mond, Fackeln an Mauern und Toren, Lagerfeuer, Glühwürmchen. Zum Ansehen: `?night=0..1` an die URL hängen (z. B. `?night=1`).
