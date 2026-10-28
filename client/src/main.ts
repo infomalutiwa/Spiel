@@ -5,6 +5,7 @@ import { World } from './render/scene';
 import { UnitViews } from './render/units';
 import { Effects } from './render/effects';
 import { FortressViews } from './render/fortress';
+import { nightLevel } from './render/night';
 import { Controls } from './input/controls';
 import { Ui, reasonText } from './ui/ui';
 import { showGallery } from './gallery';
@@ -22,6 +23,7 @@ let controls: Controls | undefined;
 let minimap: Minimap | undefined;
 
 const INTERP_MS = 120;
+const nightParam = new URLSearchParams(location.search).has('night') ? Number(new URLSearchParams(location.search).get('night') || 1) : undefined;
 let last = performance.now();
 let lobbyAngle = 0;
 
@@ -35,6 +37,7 @@ function loop(now: number) {
     views.sync(ip, conn.you, controls.selected, dt);
     fortress.sync(ip?.b.units ?? [], s?.zones, dt);
     fortress.showCrown(s?.phase === 'prep');
+    world.night.target = nightParam ?? nightLevel(s?.wave ?? 0);
     world.setPlacementZone(s?.phase === 'prep');
     fx.update(dt);
     controls.frame(dt);

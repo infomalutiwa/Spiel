@@ -4,7 +4,9 @@ import { UNIT_DEFS, isStructureType } from '@burgwacht/shared';
 import { loadModel } from './assets';
 import type { World } from './scene';
 
-const SCALE = { wall: 3.0, gate: 3.7, tower: 4.3 };
+const SCALE = { wall: 3.0, gate: 3.5, tower: 4.3 };
+/** half the visible length of a gate / tower along the wall, used to close the gaps between the pieces */
+const HALF = { gate: 4.6, tower: 2.35 };
 const MODEL = { wall: 'hex/wall_straight', gate: 'hex/wall_straight_gate', tower: 'hex/building_tower_base_blue' };
 const LEVEL_TINT = [new THREE.Color(1, 1, 1), new THREE.Color(0.86, 0.98, 1.18), new THREE.Color(1.3, 1.12, 0.78)];
 
@@ -51,9 +53,21 @@ export class FortressViews {
   private setMap(map: MapDef) {
     this.map = map;
     this.group.clear(); this.slots = []; this.zones = []; this.crown = undefined;
+    // every wall piece stretches from its neighbour on one side to its neighbour on the other, so nothing is left open
+    const span = new Map<number, { a: number; b: number }>();
+    map.barriers.forEach((_, bi) => {
+      const line = map.walls.map((w, i) => ({ w, i })).filter(o => o.w.bar === bi).sort((p, q) => p.w.y - q.w.y);
+      line.forEach((o, k) => {
+        const prev = line[k - 1]?.w, next = line[k + 1]?.w, y = o.w.y;
+        const edge = (n: WallDef | undefined, dir: number) => !n ? y + dir * 3.2 : n.kind === 'wall' ? (y + n.y) / 2 : n.y - dir * HALF[n.kind];
+        span.set(o.i, { a: edge(prev, -1), b: edge(next, 1) });
+      });
+    });
     const build = async (def: WallDef, slot: number) => {
       const root = new THREE.Group();
-      root.position.set(def.x, 0, def.y);
+      const sp = span.get(slot);
+      const cy = def.kind === 'wall' && sp ? (sp.a + sp.b) / 2 : def.y; // pieces that fill a gap are centred in it
+      root.position.set(def.x, 0, cy);
       root.rotation.y = Math.PI / 2;
       this.group.add(root);
       const rub = new THREE.Group(); rub.visible = false; root.add(rub);
@@ -68,10 +82,11 @@ export class FortressViews {
           if (m.isMesh) { m.material = (m.material as THREE.Material).clone(); sv.materials.push(m.material as THREE.MeshStandardMaterial); m.castShadow = m.receiveShadow = true; }
         });
         o.scale.setScalar(SCALE[def.kind]);
-        if (def.kind === 'gate') o.scale.set(SCALE.gate * 1.1, SCALE.gate, SCALE.gate * 1.05);
+        if (def.kind === 'wall' && sp) o.scale.set(((sp.b - sp.a) + 0.5) / 2, SCALE.wall * 1.05, SCALE.wall * 1.1); // x is the length of the model
+        if (def.kind === 'gate') o.scale.set(HALF.gate * 2 * 1.04 / 2, SCALE.gate * 1.06, SCALE.gate * 1.05);
         root.add(o); sv.model = o;
       }
-      if (ruin) { const r = ruin.clone(true); r.scale.setScalar(def.kind === 'wall' ? 3.2 : 4.2); r.traverse(c => { (c as THREE.Mesh).castShadow = true; }); rub.add(r); }
+      if (ruin) { const r = ruin.clone(true); r.scale.setScalar(def.kind === 'wall' ? 3.2 : 4.4); r.traverse(c => { (c as THREE.Mesh).castShadow = true; }); rub.add(r); }
     };
     map.walls.forEach((d, i) => void build(d, i));
 

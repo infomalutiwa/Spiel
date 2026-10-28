@@ -1,7 +1,7 @@
 import type { Barrier, MapDef, WallDef, ZoneDef } from '../types';
 
 /** wall circles are ~6 apart and overlap, so nothing slips between two pieces */
-const GATE_FLANK = 8.5;
+const GATE_FLANK = 7;
 const SEG = 6.3;
 
 /**
@@ -35,7 +35,7 @@ function fortress(o: FortOpts): MapDef {
     barriers,
     walls: barriers.flatMap((b, i) => wallLine(b, i, o.depth, o.towerEvery ?? 0)),
     zones: o.zones.map((z, i) => ({ id: i, ...z })),
-    placeZone: { x0: o.keep + 12, x1: o.outer.x + 3, y0: 6, y1: o.depth - 6 },
+    placeZone: { x0: o.keep + 12, x1: o.outer.x + 3, y0: 14, y1: o.depth - 14 },
     decorSeed: o.decorSeed, waveScale: o.waveScale,
   };
 }

@@ -94,19 +94,23 @@ export class Effects {
   }
 
   private shot(ev: Extract<GameEvent, { k: 'shot' }>) {
-    const from = new THREE.Vector3(ev.x, 1.4, ev.y), to = new THREE.Vector3(ev.tx, 1.0, ev.ty);
+    const tt = this.views.typeOf(ev.to);
+    const aim = tt === 'gate' ? 2.4 : tt === 'wall' ? 2.4 : tt === 'tower' ? 4.2 : 1.0 + this.views.liftOf(ev.to);
+    const from = new THREE.Vector3(ev.x, 1.4 + this.views.liftOf(ev.from), ev.y), to = new THREE.Vector3(ev.tx, aim, ev.ty);
     const d = from.distanceTo(to);
+    const overWall = this.world.map.barriers.some(b => (ev.x - b.x) * (ev.tx - b.x) < 0); // the shot crosses a wall line
     const kind: DamageKind = ev.kind;
     if (kind === 'slash' || kind === 'spear' || kind === 'charge') { // melee: small impact spark at the target
       this.queue.push({ at: performance.now() + 90, ev: { k: 'dmg', x: -1e9, y: ev.to, amt: 0 } });
       this.spark(to.x, 1.2, to.z, '#fff4d0', { n: 4, speed: 2.5, up: 1.5, life: 0.35, s0: 0.35, s1: 0.8 });
       this.views.lunge(ev.from, to.x, to.z);
       this.views.flash(ev.to);
+      if (tt === 'gate' || tt === 'wall' || tt === 'tower') { audio.play('siege', 0.55 * this.vol(ev.tx, ev.ty)); this.world.shake(0.12); this.spark(to.x, 1.6, to.z, '#d8c8a8', { n: 3, speed: 2.2, up: 2, life: 0.5, s0: 0.5, s1: 1.1 }); }
       return;
     }
     this.views.lunge(ev.from, to.x, to.z);
     if (this.projs.length >= MAX_PROJECTILES) return;
-    let m: THREE.Object3D, speed = 28, arc = d * 0.12, spin = false, trail: THREE.ColorRepresentation | undefined;
+    let m: THREE.Object3D, speed = 28, arc = Math.max(d * 0.12, overWall ? 4.5 : 0), spin = false, trail: THREE.ColorRepresentation | undefined;
     if (kind === 'pierce' || kind === 'bolt') {
       const g = new THREE.Group();
       const shaft = new THREE.Mesh(kind === 'bolt' ? SHARED.boltShaft : SHARED.shaft, kind === 'bolt' ? SHARED.boltMat : SHARED.arrowMat);
@@ -114,13 +118,13 @@ export class Effects {
       const tip = new THREE.Mesh(SHARED.tip, SHARED.tipMat);
       tip.rotation.x = Math.PI / 2; tip.position.z = 0.5;
       g.add(shaft, tip); m = g;
-      if (kind === 'bolt') { speed = 48; arc = d * 0.02; }
+      if (kind === 'bolt') { speed = 48; arc = Math.max(d * 0.02, overWall ? 2.2 : 0); }
     } else if (kind === 'magic') {
       m = new THREE.Sprite(SHARED.orbMat);
       m.scale.setScalar(1.6); speed = 20; arc = 0.5; trail = '#c9a8ff';
     } else {
       m = new THREE.Mesh(SHARED.stone, SHARED.stoneMat);
-      speed = 14; arc = Math.max(5, d * 0.35); spin = true;
+      speed = 14; arc = Math.max(5, d * 0.35, overWall ? 9 : 0); spin = true;
     }
     const dur = Math.max(0.12, d / speed);
     m.position.copy(from);
@@ -182,10 +186,11 @@ export class Effects {
           this.ring(w.x, w.y, 5, '#cbbd9d', 0.8);
           audio.play('siege', 1); audio.play('death', 0.8);
         }
+        this.world.shake(ev.type === 'gate' ? 1.1 : 0.7);
         this.onBanner(`breach:${ev.type}`);
         break;
       }
-      case 'zone': audio.play('horn'); this.onBanner(`zone:${ev.id}:${ev.owner}`); break;
+      case 'zone': audio.play('horn'); this.world.shake(0.5); this.onBanner(`zone:${ev.id}:${ev.owner}`); break;
       case 'wave': audio.play('horn'); this.onBanner(`wave:${ev.wave}`); break;
       case 'phase': if (ev.phase === 'won') audio.play('win'); else if (ev.phase === 'lost') audio.play('lose'); this.onBanner(`phase:${ev.phase}`); break;
     }

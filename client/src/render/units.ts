@@ -71,6 +71,8 @@ class Buckets {
   }
 }
 
+/** stable pseudo-random 0..1 per id: gives every soldier its own size and shade */
+const hash01 = (n: number) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
 const ringGeo = new THREE.RingGeometry(0.8, 1, 28);
 const quad = new THREE.PlaneGeometry(1, 1);
 const pipGeo = new THREE.SphereGeometry(0.5, 8, 6);
@@ -89,6 +91,8 @@ export class UnitViews {
   private barBg: THREE.InstancedMesh;
   private barFill: THREE.InstancedMesh;
   private pips: THREE.InstancedMesh;
+  private poles: THREE.InstancedMesh;
+  private cloths: THREE.InstancedMesh;
   private hover: THREE.Mesh;
   private t = 0;
   private tmpM = new THREE.Matrix4();
@@ -96,6 +100,7 @@ export class UnitViews {
   private tmpS = new THREE.Vector3();
   private tmpP = new THREE.Vector3();
   private tmpC = new THREE.Color();
+  private tmpP2 = new THREE.Vector3();
   private up = new THREE.Vector3(0, 1, 0);
   private flat = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0));
 
@@ -113,6 +118,10 @@ export class UnitViews {
     this.barBg = inst(quad, barMat('#2b2230', 0.75), 1000, 10);
     this.barFill = inst(quad, barMat('#ffffff', 1), 1000, 11);
     this.pips = inst(pipGeo, new THREE.MeshBasicMaterial({ color: '#ffd75e', depthTest: false, transparent: true }), 1200, 12);
+    // squad standards: a pole and a team-coloured cloth over each squad leader
+    this.poles = inst(new THREE.CylinderGeometry(0.05, 0.06, 1, 5), new THREE.MeshStandardMaterial({ color: '#6b4a2b', roughness: 0.9 }), 64);
+    this.cloths = inst(new THREE.PlaneGeometry(1.5, 0.95, 4, 1), new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.85, side: THREE.DoubleSide }), 64);
+    this.poles.castShadow = true; this.cloths.castShadow = true;
     this.hover = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.8, depthWrite: false, side: THREE.DoubleSide }));
     this.hover.rotation.x = -Math.PI / 2; this.hover.visible = false; this.hover.renderOrder = 6;
     this.group.add(this.hover);
@@ -128,6 +137,9 @@ export class UnitViews {
     v.attackT = 0.55;
     v.yaw = Math.atan2(tx - v.px, tz - v.py);
   }
+  /** how high above the ground a unit stands (wall crowns) */
+  liftOf(id: number): number { return this.views.get(id)?.lift ?? 0; }
+  typeOf(id: number): UnitType | undefined { return this.views.get(id)?.snap.type; }
   flash(id: number) { const v = this.views.get(id); if (v) v.flashT = 0.14; }
 
   private ensureModel(t: UnitType) {
@@ -179,7 +191,7 @@ export class UnitViews {
   private draw(you: PlayerId, selected: Set<number>, dt: number) {
     for (const b of this.models.values()) b.begin();
     const m = this.tmpM, q = this.tmpQ, s = this.tmpS, p = this.tmpP, col = this.tmpC;
-    let nTeam = 0, nSel = 0, nBar = 0, nPip = 0;
+    let nTeam = 0, nSel = 0, nBar = 0, nPip = 0, nBan = 0;
     const camQ = this.world.camera.quaternion;
     const crowns = [...this.views.values()].map(v => v.snap).filter(u => u.type === 'wall' || u.type === 'tower');
     const barScale = Math.min(3, Math.max(1, this.world.dist / 55));
@@ -197,7 +209,8 @@ export class UnitViews {
       if (moving) v.walk += dt * fps; else v.idle += dt * 1.6;
       if (v.attackT > 0) v.attackT -= dt;
       if (v.flashT > 0) v.flashT -= dt;
-      const sc = (SCALE[u.type] ?? 1) * (0.55 + 0.45 * v.spawnT);
+      const jit = hash01(u.id), jit2 = hash01(u.id * 7 + 3), leader = u.squad > 0 && u.squad === u.id;
+      const sc = (SCALE[u.type] ?? 1) * (0.55 + 0.45 * v.spawnT) * (0.93 + 0.14 * jit) * (leader ? 1.07 : 1);
       const structure = isStructureType(u.type);
       if (u.side === 'player' && u.owner !== null && rangedOnWall(u.type)) { // marksmen on a wall crown stand on top of it
         const d = deckAt(crowns, v.px, v.py);
@@ -214,6 +227,7 @@ export class UnitViews {
         q.setFromAxisAngle(this.up, v.yaw); s.setScalar(sc);
         m.compose(p, q, s);
         col.copy(this.tintFor(u, you));
+        col.r *= 0.93 + 0.14 * jit; col.g *= 0.93 + 0.14 * jit2; col.b *= 0.93 + 0.14 * hash01(u.id * 13 + 1); // every soldier a slightly different shade
         if (v.flashT > 0) col.multiplyScalar(2.2);
         baked.add(frame, m, col);
       } else if (v.obj) {
@@ -221,6 +235,16 @@ export class UnitViews {
         if (moving) v.obj.position.y += Math.abs(Math.sin(this.t * 6 + v.id)) * 0.05;
       }
 
+      if (leader && nBan < 64 && baked) {
+        const ph = (baked.model.height ?? 3) * (SCALE[u.type] ?? 1) * 1.07 + 1.3;
+        q.identity(); s.set(1, ph, 1); m.compose(this.tmpP2.set(v.px, y + ph / 2, v.py), q, s);
+        this.poles.setMatrixAt(nBan, m); this.poles.setColorAt(nBan, this.tmpC.set(1, 1, 1));
+        const wave = Math.sin(this.t * 4 + u.id) * 0.18;
+        q.setFromAxisAngle(this.up, wave); s.set(1, 1, 1);
+        m.compose(this.tmpP2.set(v.px + 0.75, y + ph - 0.55, v.py), q, s);
+        this.cloths.setMatrixAt(nBan, m); this.cloths.setColorAt(nBan, PAL.team[u.owner ?? you]);
+        nBan++;
+      }
       // team ring under every unit
       if (nTeam < 1500 && !structure) {
         const r = def.radius * 1.15 + 0.35;
@@ -286,7 +310,7 @@ export class UnitViews {
       if (w.t > 2) { this.group.remove(w.obj); this.wrecks.splice(i, 1); }
     }
     for (const b of this.models.values()) b.end();
-    for (const [im, n] of [[this.teamRings, nTeam], [this.selRings, nSel], [this.barBg, nBar], [this.barFill, nBar], [this.pips, nPip]] as const) {
+    for (const [im, n] of [[this.teamRings, nTeam], [this.selRings, nSel], [this.barBg, nBar], [this.barFill, nBar], [this.pips, nPip], [this.poles, nBan], [this.cloths, nBan]] as const) {
       im.count = n; im.visible = n > 0;
       im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true;
     }

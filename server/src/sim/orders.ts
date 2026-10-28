@@ -49,8 +49,8 @@ export function placementSlots(s: GameState, units: Unit[], x: number, y: number
   const bar = wallLineAt(map, x);
   const clamp = (p: Vec2): Vec2 => ({ x: Math.min(z.x1, Math.max(z.x0, p.x)), y: Math.min(z.y1, Math.max(z.y0, p.y)) });
   if (bar >= 0 && units.every(u => u.type in TROOPS && canManWalls(u.type as TroopType))) {
-    const bx = map.barriers[bar].x, n = units.length, step = Math.min(1.9, (map.depth - 12) / Math.max(1, n));
-    const y0 = Math.min(map.depth - 6 - ((n - 1) * step) / 2, Math.max(6 + ((n - 1) * step) / 2, y));
+    const bx = map.barriers[bar].x, n = units.length, step = Math.min(1.9, (z.y1 - z.y0) / Math.max(1, n));
+    const y0 = Math.min(z.y1 - ((n - 1) * step) / 2, Math.max(z.y0 + ((n - 1) * step) / 2, y));
     return units.map((_, i) => ({ x: bx, y: y0 + (i - (n - 1) / 2) * step }));
   }
   const cx = bar >= 0 ? map.barriers[bar].x - 5.2 : x; // the rest stand behind the wall, not on it

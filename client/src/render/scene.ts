@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { MapDef, MapTheme } from '@burgwacht/shared';
 import { PAL } from './palette';
 import { loadModel, modelInstance } from './assets';
+import { NightCycle } from './night';
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 const smooth = (e0: number, e1: number, x: number) => {
@@ -32,6 +33,8 @@ const LOOKS: Record<MapTheme, Look> = {
 
 type Spot = { x: number; z: number; s: number; r: number };
 
+const vzx = (m: MapDef) => m.zones[0].x - 6;
+
 export class World {
   renderer: THREE.WebGLRenderer;
   scene = new THREE.Scene();
@@ -47,6 +50,12 @@ export class World {
   private content = new THREE.Group();
   private clouds: THREE.Object3D[] = [];
   private pollen!: THREE.Points;
+  pollenMat!: THREE.PointsMaterial;
+  cloudMat!: THREE.MeshStandardMaterial;
+  hemi!: THREE.HemisphereLight;
+  night!: NightCycle;
+  private skyCv = document.createElement('canvas');
+  private skyTex = new THREE.CanvasTexture(this.skyCv);
   /** called after every (re)build so overlays that belong to the map can follow */
   onMapBuilt: ((m: MapDef) => void)[] = [];
   private zone?: THREE.Group;
@@ -54,6 +63,9 @@ export class World {
   private ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   private t = 0;
   private sunOffset = new THREE.Vector3(55, 75, 45);
+  private shakeAmp = 0;
+  /** camera shake for heavy impacts (breaches, rams) */
+  shake(a: number) { this.shakeAmp = Math.min(1.4, this.shakeAmp + a); }
 
   constructor(public canvas: HTMLCanvasElement, map: MapDef) {
     this.map = map;
@@ -71,7 +83,8 @@ export class World {
     this.scene.background = this.skyTexture();
     this.scene.add(this.content);
 
-    this.scene.add(new THREE.HemisphereLight(PAL.hemiSky, PAL.hemiGround, 1.05));
+    this.hemi = new THREE.HemisphereLight(PAL.hemiSky, PAL.hemiGround, 1.05);
+    this.scene.add(this.hemi);
     this.sun = new THREE.DirectionalLight(this.look.sun, this.look.sunI);
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(matchMedia('(pointer: coarse)').matches ? 2048 : 4096, matchMedia('(pointer: coarse)').matches ? 2048 : 4096);
@@ -81,6 +94,8 @@ export class World {
     this.scene.add(this.sun, this.sun.target);
 
     this.build();
+    this.night = new NightCycle(this);
+    this.night.rebuild(map);
     this.resize();
     addEventListener('resize', () => this.resize());
   }
@@ -113,6 +128,7 @@ export class World {
     (this.scene.fog as THREE.Fog).color.set(this.look.fog);
     this.scene.background = this.skyTexture();
     this.build();
+    this.night.rebuild(map);
     this.onMapBuilt.forEach(f => f(map));
   }
 
@@ -124,12 +140,16 @@ export class World {
   }
 
   private skyTexture() {
-    const cv = document.createElement('canvas'); cv.width = 4; cv.height = 256;
+    this.paintSky([this.look.skyTop, this.look.skyMid, this.look.skyLow]);
+    return this.skyTex;
+  }
+  paintSky(c: [string, string, string]) {
+    const cv = this.skyCv; cv.width = 4; cv.height = 256;
     const g = cv.getContext('2d')!;
     const grad = g.createLinearGradient(0, 0, 0, 256);
-    grad.addColorStop(0, this.look.skyTop); grad.addColorStop(0.55, this.look.skyMid); grad.addColorStop(1, this.look.skyLow);
+    grad.addColorStop(0, c[0]); grad.addColorStop(0.55, c[1]); grad.addColorStop(1, c[2]);
     g.fillStyle = grad; g.fillRect(0, 0, 4, 256);
-    const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; return t;
+    this.skyTex.colorSpace = THREE.SRGBColorSpace; this.skyTex.needsUpdate = true;
   }
 
   /** flat playfield with rolling hills beyond its rim */
@@ -199,6 +219,7 @@ export class World {
       const road = (1 - smooth(1.8, 4.6, rd)) * inside;
       const plaza = (1 - smooth(-1, 4, pd)) * inside; // cobbled courtyards inside the walls
       tmp.lerp(edge, Math.min(1, road * 0.85 + plaza * 0.7)).lerp(path, Math.min(1, road * (1 - smooth(1, 3, rd) * 0.5) * 0.8 + plaza * 0.55));
+      if (plaza > 0.1) tmp.multiplyScalar(1 - plaza * 0.1 + plaza * noise2(Math.floor(x * 0.9), Math.floor(z * 0.9)) * 0.14); // cobblestones
       col[i * 3] = tmp.r; col[i * 3 + 1] = tmp.g; col[i * 3 + 2] = tmp.b;
     }
     geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
@@ -285,9 +306,9 @@ export class World {
 
     // the pass: a ridge of mountains closes the north and south edges (and the far east, leaving the road open)
     const ridge = (pts: Spot[]) => ['hex/mountain_A_grass_trees', 'hex/mountain_B_grass_trees', 'hex/mountain_C_grass_trees'].forEach((n, k) =>
-      void this.instanced(into, n, m.theme === 'valley' ? 46 : 36, pts.filter((_, i) => i % 3 === k)));
+      void this.instanced(into, n, m.theme === 'valley' ? 34 : 26, pts.filter((_, i) => i % 3 === k)));
     const ridgePts: Spot[] = [];
-    for (let x = -22; x <= m.width + 24; x += 17) for (const z of [-15, m.depth + 15]) ridgePts.push({ x: x + (R() - 0.5) * 6, z: z + (R() - 0.5) * 6 * (z < 0 ? -1 : 1), s: 0.85 + R() * 0.5, r: R() * 6.28 });
+    for (let x = -22; x <= m.width + 24; x += 17) for (const z of [-19, m.depth + 19]) ridgePts.push({ x: x + (R() - 0.5) * 6, z: z + (R() - 0.5) * 6 * (z < 0 ? -1 : 1), s: 0.85 + R() * 0.5, r: R() * 6.28 });
     for (let z = -4; z <= m.depth + 4; z += 17) {
       ridgePts.push({ x: -18 + (R() - 0.5) * 4, z, s: 0.9 + R() * 0.5, r: R() * 6.28 });
       if (m.spawns.every(sp => Math.abs(sp.y - z) > 15)) ridgePts.push({ x: m.width + 16 + (R() - 0.5) * 4, z, s: 0.9 + R() * 0.5, r: R() * 6.28 });
@@ -306,6 +327,55 @@ export class World {
     });
     const heights: Record<string, number> = { 'hex/barrel': 1.7, 'hex/crate_A_big': 1.9, 'hex/weaponrack': 2.6, 'hex/bucket_arrows': 1.5, 'hex/sack': 1.4, 'hex/target': 2.8, 'hex/crate_B_small': 1.4, 'hex/wheelbarrow': 1.7 };
     for (const [n, list] of propSpots) void this.instanced(into, n, heights[n], list, true);
+    // houses and little details along the north and south edges of both courtyards, so the fortress feels lived in
+    const [outerB, innerB] = m.barriers;
+    const rows: { x0: number; x1: number; kinds: string[] }[] = [
+      { x0: innerB.x + 16, x1: outerB.x - 16, kinds: ['barracks', 'home_A', 'archeryrange', 'home_B', 'blacksmith', 'home_A', 'tavern', 'home_B'] },
+      { x0: m.castle.x + 24, x1: innerB.x - 14, kinds: ['market', 'home_A', 'church', 'home_B', 'well', 'home_A', 'tavern'] },
+    ];
+    const bh: Record<string, number> = { home_A: 5.6, home_B: 5.6, tavern: 8, market: 6.2, well: 4.5, church: 10, blacksmith: 6.5, barracks: 8, archeryrange: 7.2 };
+    const bySpot = new Map<string, Spot[]>();
+    rows.forEach((row, ri) => {
+      const n = Math.max(2, Math.floor((row.x1 - row.x0) / 13));
+      for (const north of [true, false]) for (let i = 0; i < n; i++) {
+        const kind = row.kinds[(i + (north ? 0 : 3) + ri) % row.kinds.length];
+        const key = `hex/building_${kind}_${north ? 'blue' : ri ? 'green' : 'red'}`;
+        const x = row.x0 + ((i + 0.5) / n) * (row.x1 - row.x0) + (R() - 0.5) * 2;
+        const z = north ? 7.5 + (R() - 0.5) * 1.5 : m.depth - 7.5 + (R() - 0.5) * 1.5;
+        bySpot.set(key, [...(bySpot.get(key) ?? []), { x, z, s: 0.95 + R() * 0.15, r: north ? Math.PI : 0 }]);
+        // a small tree or hedge between the houses
+        if (i < n - 1 && R() < 0.8) bySpot.set('hex/tree_single_A', [...(bySpot.get('hex/tree_single_A') ?? []), { x: x + (row.x1 - row.x0) / n / 2, z: north ? 6 : m.depth - 6, s: 0.5 + R() * 0.3, r: R() * 6.28 }]);
+      }
+    });
+    for (const [key, list] of bySpot) {
+      const name = key.replace(/^hex\/building_/, '').replace(/_(blue|red|green)$/, '');
+      void this.instanced(into, key, key === 'hex/tree_single_A' ? 6.5 : bh[name] ?? 6, list, true);
+    }
+    // wooden fences along the inner edge of the house rows, a well and a market stall on the Schlossplatz
+    const fence: Spot[] = [];
+    for (const z of [12.5, m.depth - 12.5]) for (let x = m.castle.x + 18; x < outerB.x - 8; x += 5.6) if (Math.abs(x - innerB.x) > 8) fence.push({ x, z, s: 1, r: Math.PI / 2 });
+    void this.instanced(into, 'hex/fence_wood_straight', 1.5, fence.map(f => ({ ...f, r: 0 })), false);
+    const sz = m.zones[1];
+    void this.instanced(into, 'hex/building_well_blue', 4.5, [{ x: sz.x - 5, z: sz.y - 9, s: 1, r: 0 }], true);
+    void this.instanced(into, 'hex/building_market_blue', 6.2, [{ x: sz.x - 5, z: sz.y + 9, s: 1, r: Math.PI }], true);
+    // braziers' stone bases, banners and hay along the road inside the walls
+    void this.instanced(into, 'hex/sack', 1.4, [-1, 1].flatMap(sg => [0, 1].map(k => ({ x: outerB.x - 10 - k * 2.2, z: outerB.gateY + sg * 11, s: 1, r: k * 2 }))), true);
+
+    // clutter of a busy courtyard in the bands north and south of the middle: crates, barrels, racks, dummies, carts
+    const band: Spot[][] = props.map(() => []);
+    for (const [a, b2] of [[innerB.x + 14, outerB.x - 14], [m.castle.x + 22, innerB.x - 12]]) {
+      for (let x = a; x < b2; x += 7 + R() * 5) for (const north of [true, false]) {
+        if (R() < 0.35) continue;
+        const k = Math.floor(R() * props.length);
+        band[k].push({ x: x + (R() - 0.5) * 3, z: north ? 16 + R() * 6 : m.depth - 16 - R() * 6, s: 0.9 + R() * 0.3, r: R() * 6.28 });
+      }
+    }
+    props.forEach((n, k) => void this.instanced(into, n, heights[n], band[k], true));
+    // campfires with their log seats
+    const camps = [{ x: vzx(m), z: 20 }, { x: vzx(m) + 14, z: m.depth - 20 }, { x: m.zones[1].x - 12, z: 22 }];
+    void this.instanced(into, 'campfire_logs', 1.6, camps.map(c => ({ ...c, s: 1, r: 0.6 })), true);
+    void this.instanced(into, 'log', 1.0, camps.flatMap(c => [0, 2.1, 4.2].map(a => ({ x: c.x + Math.cos(a) * 2.6, z: c.z + Math.sin(a) * 2.6, s: 1, r: a + 1.57 }))), true);
+
     // tents and fire pits where the troops of the Vorhof rest
     const vz = m.zones[0];
     void this.instanced(into, 'hex/tent', 4.4, [-1, 1].map((sg, i) => ({ x: vz.x + vz.r * 0.55, z: vz.y + sg * (vz.r * 0.75), s: 1, r: i * 3 })), true);
@@ -341,7 +411,7 @@ export class World {
   }
 
   private buildClouds() {
-    const mat = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 1, transparent: true, opacity: 0.92, emissive: new THREE.Color('#ffe8cc'), emissiveIntensity: 0.25 });
+    const mat = this.cloudMat = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 1, transparent: true, opacity: 0.92, emissive: new THREE.Color('#ffe8cc'), emissiveIntensity: 0.25 });
     const R = rng(11);
     const n = Math.round(14 * (this.map.width * this.map.depth) / (240 * 150));
     for (let i = 0; i < n; i++) {
@@ -366,7 +436,7 @@ export class World {
     const g = cv.getContext('2d')!; const rg = g.createRadialGradient(16, 16, 0, 16, 16, 16);
     rg.addColorStop(0, 'rgba(255,240,190,1)'); rg.addColorStop(1, 'rgba(255,240,190,0)');
     g.fillStyle = rg; g.fillRect(0, 0, 32, 32);
-    this.pollen = new THREE.Points(geo, new THREE.PointsMaterial({
+    this.pollen = new THREE.Points(geo, this.pollenMat = new THREE.PointsMaterial({
       size: 0.8, map: new THREE.CanvasTexture(cv), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.8,
     }));
     this.pollen.frustumCulled = false;
@@ -423,6 +493,11 @@ export class World {
       this.target.y + this.dist * sp,
       this.target.z + Math.cos(this.yaw) * this.dist * cp);
     this.camera.lookAt(this.target);
+    if (this.shakeAmp > 0.01) {
+      const k = this.shakeAmp * 0.55;
+      this.camera.position.x += (Math.random() - 0.5) * k; this.camera.position.y += (Math.random() - 0.5) * k * 0.6; this.camera.position.z += (Math.random() - 0.5) * k;
+      this.shakeAmp *= Math.pow(0.02, dt);
+    }
 
     // the shadow window follows the camera so shadows stay crisp on huge maps
     const snap = 2;
@@ -443,6 +518,7 @@ export class World {
       p.setX(i, x);
     }
     p.needsUpdate = true;
+    this.night.update(dt);
     this.renderer.render(this.scene, this.camera);
   }
 }

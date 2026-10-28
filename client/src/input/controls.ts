@@ -391,7 +391,7 @@ export class Controls {
       const radius = 1.2 + Math.sqrt(n) * 1.15;
       if (this.ghost) { this.ghost.visible = !crown; this.ghost.position.set(px, 0, g.y); }
       this.crownGhost.visible = crown;
-      if (crown) { const len = Math.min(map.depth - 12, n * 1.9 + 1.2); this.crownGhost.position.set(px, 3.55, Math.min(map.depth - 6 - len / 2, Math.max(6 + len / 2, g.y))); this.crownGhost.scale.set(1.6, len, 1); }
+      if (crown) { const len = Math.min(zn.y1 - zn.y0, n * 1.9 + 1.2); this.crownGhost.position.set(px, 3.55, Math.min(zn.y1 - len / 2, Math.max(zn.y0 + len / 2, g.y))); this.crownGhost.scale.set(1.6, len, 1); }
       this.ringGhost.visible = !crown; this.ringGhost.position.set(px, 0.15, g.y);
       this.ringGhost.scale.setScalar(radius);
       (this.ringGhost.material as THREE.MeshBasicMaterial).color.set(ok ? '#fff3c4' : '#ff8d8d');
