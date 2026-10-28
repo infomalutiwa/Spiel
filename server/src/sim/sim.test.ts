@@ -80,13 +80,6 @@ describe('combat and counters', () => {
     expect(s.players[0].gold).toBe(g0);
     expect(e2.hp).toBeLessThan(e2.maxHp);
   });
-  it('levels up after enough kills', () => {
-    const s = battle();
-    const k = mine(s, 'knight', 60, 40);
-    for (let i = 0; i < 4; i++) foe(s, 'footman', 62, 40 + i).hp = 1;
-    run(s, 8);
-    expect(k.level).toBeGreaterThanOrEqual(2);
-  });
 });
 
 describe('special troops', () => {
@@ -110,17 +103,6 @@ describe('special troops', () => {
     expect(a.hp).toBeLessThan(a.maxHp);
     expect(b.hp).toBeLessThan(b.maxHp);
     expect(far.hp).toBe(far.maxHp);
-  });
-  it('catapult prefers siege targets over nearer infantry, and idles with none', () => {
-    const s = battle();
-    const c = mine(s, 'catapult', 40, 40);
-    c.order = { kind: 'hold', x: 40, y: 40 };
-    run(s, 0.5);
-    expect(Number.isFinite(c.x)).toBe(true);
-    const near = foe(s, 'footman', 50, 40), ram = foe(s, 'ram', 58, 40);
-    near.order = ram.order = { kind: 'hold', x: 50, y: 40 };
-    run(s, 0.2);
-    expect(c.targetId).toBe(ram.id);
   });
   it('crossbow ignores part of heavy armor', () => {
     const s = battle();
@@ -159,7 +141,7 @@ describe('orders', () => {
     expect(applyCommand(s, 0, { c: 'buy', troop: 'knight', x: 5, y: 5 })).toEqual({ ok: false, reason: 'outside_zone' });
     expect(applyCommand(s, 0, { c: 'buy', troop: 'nope' as never, x: 140, y: 60 }).ok).toBe(false);
     expect(applyCommand(s, 0, { c: 'buy', troop: 'knight', x: NaN, y: 60 }).ok).toBe(false);
-    s.phase = 'battle';
+    s.phase = 'won';
     expect(applyCommand(s, 0, { c: 'buy', troop: 'knight', x: 140, y: 60 })).toEqual({ ok: false, reason: 'not_prep' });
   });
   it('rejects orders for units the player does not own, changing nothing', () => {

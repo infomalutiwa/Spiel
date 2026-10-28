@@ -1,5 +1,5 @@
 import {
-  DECK_HEIGHT, MAPS, UNIT_DEFS, deckAt, isStructureType, rangedOnWall,
+  DECK_HEIGHT, MAPS, UNIT_DEFS, ZONE_FALL_PAUSE, deckAt, isStructureType, rangedOnWall,
   type GameState, type MapDef, type Unit, type Vec2,
 } from '@burgwacht/shared';
 import { castleOf, pushEvent } from './state';
@@ -46,7 +46,7 @@ export function enemyGoal(s: GameState, u: Unit, bs: BarrierInfo[], held: Unit[]
       return { x: bar.x + 5.2 + (u.id % 3) * 1.4, y: bar.gateY + j * 1.2 };
     }
     const z = map.zones[idx];
-    if (s.zones[idx].reached) { u.step++; continue; }
+    if (s.zones[idx].reached && s.zones[idx].hold <= 0) { u.step++; continue; } // a fallen zone is only left after the siege pause
     const hold = held[idx];
     if (hold?.length) { // defenders are keeping the zone: go and dislodge the nearest one
       const d = hold.reduce((b, o) => (Math.hypot(o.x - u.x, o.y - u.y) < Math.hypot(b.x - u.x, b.y - u.y) ? o : b));
@@ -77,6 +77,7 @@ export function stepZones(s: GameState, dt: number): void {
   const grid = gridOf(s);
   map.zones.forEach((zd, i) => {
     const z = s.zones[i];
+    if (z.hold > 0) z.hold = Math.max(0, z.hold - dt);
     let ne = 0, nd = 0;
     grid.near(zd.x, zd.y, zd.r + 1, u => {
       if (u.hp <= 0 || isStructureType(u.type) || u.type === 'castle') return;
@@ -89,7 +90,7 @@ export function stepZones(s: GameState, dt: number): void {
     if (ne === 0 && nd === 0) rate = z.owner === 'enemy' ? 0 : -0.01; // an abandoned bar slowly drains
     z.progress = Math.min(1, Math.max(0, z.progress + Math.max(-0.1, Math.min(0.12, rate)) * dt));
     if (z.owner === 'player' && z.progress >= 1) {
-      z.owner = 'enemy'; z.reached = true;
+      z.owner = 'enemy'; z.reached = true; z.hold = ZONE_FALL_PAUSE;
       pushEvent(s, { k: 'zone', id: i, owner: 'enemy' });
       for (const u of s.units) if (u.side === 'player' && u.owner !== null && u.hp > 0 && Math.hypot(u.x - zd.x, u.y - zd.y) <= zd.r) u.morale -= 20;
     } else if (z.owner === 'enemy' && i < map.zones.length - 1 && z.progress < 0.4) {

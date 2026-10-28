@@ -34,6 +34,7 @@ const SHARED = {
   boltMat: new THREE.MeshBasicMaterial({ color: '#ffe9a8' }),
   tipMat: new THREE.MeshBasicMaterial({ color: '#d7dde3' }),
   stoneMat: new THREE.MeshStandardMaterial({ color: '#8b8580', roughness: 1 }),
+  fireStoneMat: new THREE.MeshStandardMaterial({ color: '#4a2a18', emissive: '#ff6a1c', emissiveIntensity: 1.2, roughness: 1 }),
   orbMat: new THREE.SpriteMaterial({ map: glow, color: '#b78cff', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }),
 };
 const MAX_PROJECTILES = 160, MAX_QUEUE = 500, MAX_EVENT_AGE_MS = 600;
@@ -160,9 +161,21 @@ export class Effects {
         this.spark(ev.x, 0.8, ev.y, '#7be09a', { n: 3, speed: 0.8, up: 2.4, g: -1, life: 0.9, s0: 0.35, s1: 0.2 });
         break;
       case 'aoe': {
-        const col = { magic: '#b78cff', arrows: '#ffe3a8', rally: '#ffd75e', siege: '#d8c8a8' }[ev.kind];
+        const col = { magic: '#b78cff', arrows: '#ffe3a8', rally: '#ffd75e', siege: '#d8c8a8', frost: '#9fdcff', fire: '#ff9a3c' }[ev.kind];
         this.ring(ev.x, ev.y, ev.r, col, ev.kind === 'rally' ? 0.9 : 0.5);
-        audio.play(ev.kind === 'rally' ? 'rally' : ev.kind === 'magic' ? 'magic' : ev.kind === 'arrows' ? 'arrow' : 'siege', Math.max(0.5, this.vol(ev.x, ev.y)));
+        audio.play(ev.kind === 'rally' ? 'rally' : ev.kind === 'magic' || ev.kind === 'frost' ? 'magic' : ev.kind === 'arrows' ? 'arrow' : 'siege', Math.max(0.5, this.vol(ev.x, ev.y)));
+        if (ev.kind === 'siege' && ev.r >= 2.5) { // a stone lands: dust column, flying rubble, the ground shakes
+          this.spark(ev.x, 0.6, ev.y, '#cbbd9d', { n: 22, speed: ev.r * 1.3, up: 5, g: 9, life: 1.0, s0: 1.0, s1: 3.2, o0: 0.9 });
+          this.spark(ev.x, 1.2, ev.y, '#7d756d', { n: 10, speed: ev.r * 1.2, up: 8, g: 16, life: 0.8, s0: 0.5, s1: 0.9 });
+          this.ring(ev.x, ev.y, ev.r * 0.6, '#fff1c9', 0.3);
+          this.world.shake(0.25 * this.vol(ev.x, ev.y) + 0.05);
+        }
+        if (ev.kind === 'fire') {
+          this.spark(ev.x, 0.8, ev.y, '#ff8a2c', { n: 26, speed: ev.r * 1.2, up: 5, g: -1.5, life: 1.2, s0: 1.0, s1: 0.3, o0: 0.95 });
+          this.spark(ev.x, 0.6, ev.y, '#ffd27a', { n: 14, speed: ev.r * 0.8, up: 4, g: -1, life: 0.8, s0: 0.7, s1: 0.2 });
+          this.world.shake(0.2 * this.vol(ev.x, ev.y) + 0.05);
+        }
+        if (ev.kind === 'frost') this.spark(ev.x, 0.8, ev.y, '#bfe9ff', { n: 14, speed: ev.r, up: 2, g: 1, life: 0.8, s0: 0.5, s1: 1.2 });
         if (ev.kind === 'arrows') this.arrowRain(ev.x, ev.y, ev.r);
         if (ev.kind === 'rally') this.spark(ev.x, 0.5, ev.y, '#ffd75e', { n: 26, speed: ev.r * 0.7, up: 5, g: 1, life: 1.1, s0: 0.5, s1: 0.2 });
         if (ev.kind === 'magic') this.spark(ev.x, 0.8, ev.y, '#c9a8ff', { n: 12, speed: ev.r, up: 2, life: 0.6, s0: 0.6, s1: 1.4 });
@@ -172,6 +185,13 @@ export class Effects {
         audio.play('death', this.vol(ev.x, ev.y));
         this.spark(ev.x, 0.8, ev.y, '#f2ead7', { n: 7, speed: 2.6, up: 2, life: 0.7, s0: 0.8, s1: 2.0, o0: 0.8 });
         this.spark(ev.x, 1.2, ev.y, '#ffd75e', { n: 3, speed: 1.5, up: 4, g: 8, life: 0.6, s0: 0.3, s1: 0.1 });
+        break;
+      case 'lob': this.lob(ev); break;
+      case 'dry': this.onBanner(`dry:${ev.owner}`); this.float(ev.x, ev.y, 'Kein Stein!', 'big'); break;
+      case 'revive':
+        audio.play('heal', this.vol(ev.x, ev.y));
+        this.ring(ev.x, ev.y, 2.6, '#9af0b4', 0.8);
+        this.spark(ev.x, 0.5, ev.y, '#ffe9a3', { n: 14, speed: 1.4, up: 5, g: 1, life: 1.1, s0: 0.5, s1: 0.15 });
         break;
       case 'level':
         audio.play('level', this.vol(ev.x, ev.y));
@@ -196,6 +216,19 @@ export class Effects {
     }
   }
 
+  /** a catapult stone in flight: a high lazy arc that lasts exactly as long as the shell does in the simulation */
+  private lob(ev: Extract<GameEvent, { k: 'lob' }>) {
+    if (this.projs.length >= MAX_PROJECTILES) return;
+    const from = new THREE.Vector3(ev.x, 2.2, ev.y), to = new THREE.Vector3(ev.tx, 0.4, ev.ty);
+    const d = from.distanceTo(to);
+    const m = new THREE.Mesh(SHARED.stone, ev.fire ? SHARED.fireStoneMat : SHARED.stoneMat);
+    m.scale.setScalar(ev.fire ? 0.95 : 0.85);
+    m.position.copy(from); this.group.add(m);
+    audio.play('siege', this.vol(ev.x, ev.y) * 0.8);
+    this.spark(ev.x, 2.4, ev.y, '#e8dcc0', { n: 8, speed: 2.5, up: 3, life: 0.5, s0: 0.6, s1: 1.4 }); // the arm snaps forward
+    this.projs.push({ m, from, to, t: 0, dur: Math.max(0.3, ev.t), arc: Math.max(6, d * 0.42), spin: true, trail: ev.fire ? '#ff9a3c' : '#bdb4a4' });
+  }
+
   private arrowRain(cx: number, cz: number, r: number) {
     for (let i = 0; i < 26 && this.projs.length < MAX_PROJECTILES; i++) {
       const a = Math.random() * 6.28, rr = Math.sqrt(Math.random()) * r;
@@ -213,8 +246,16 @@ export class Effects {
     }
   }
 
+  private flameT = 0;
+
   update(dt: number) {
     const now = performance.now();
+    this.flameT -= dt;
+    if (this.flameT <= 0) { // burning units shed flames and smoke
+      this.flameT = 0.14;
+      let n = 0;
+      for (const b of this.views.burning) { if (n++ > 24) break; this.spark(b.x, 1.0 + b.h, b.y, Math.random() < 0.5 ? '#ff9a3c' : '#ffd27a', { n: 1, speed: 0.5, up: 2.4, g: -2, life: 0.55, s0: 0.5, s1: 0.1, o0: 0.9 }); if (Math.random() < 0.3) this.spark(b.x, 1.9 + b.h, b.y, '#4a4440', { n: 1, speed: 0.3, up: 1.6, g: -1, life: 0.8, s0: 0.3, s1: 0.9, o0: 0.5 }); }
+    }
     for (let i = 0; i < this.queue.length; ) {
       if (this.queue[i].at <= now) {
         const { at, ev } = this.queue.splice(i, 1)[0];

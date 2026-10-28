@@ -1,5 +1,5 @@
 import type { GameState, PlayerId, TroopType } from '@burgwacht/shared';
-import { MAPS, canManWalls, squadCost } from '@burgwacht/shared';
+import { BARRACKS, MAPS, MAX_BARRACKS, TECH_COST, canManWalls, squadCost, stoneLotCost } from '@burgwacht/shared';
 import { applyCommand } from './orders';
 import { castAbility } from './abilities';
 
@@ -72,5 +72,29 @@ export function botRepair(s: GameState): void {
   for (const u of s.units) {
     if (u.slot < 0 || u.hp <= 0 || u.hp > u.maxHp * 0.4 || map.walls[u.slot].kind === 'wall') continue;
     applyCommand(s, s.players[0].gold >= s.players[1].gold ? 0 : 1, { c: 'wall', op: 'repair', slot: u.slot });
+  }
+}
+
+/** which branch the scripted player picks for each troop type */
+export const BOT_BRANCH: Record<TroopType, 1 | 2> = {
+  archer: 1, knight: 1, spearman: 1, cavalry: 1, crossbowman: 2, mage: 2, healer: 2, catapult: 1,
+};
+
+/**
+ * Preparation-phase money management of a careful player: keep the catapults supplied with stone, spend gems on
+ * the troop types of the army (in the order of the mix) and grow the barracks when the army is full.
+ */
+export function botEconomy(s: GameState, mix: TroopType[]): void {
+  for (const p of [0, 1] as PlayerId[]) {
+    const me = s.players[p];
+    if (mix.includes('catapult')) for (let i = 0; i < 4 && me.stone < 40 && me.gold > stoneLotCost() + 500; i++) applyCommand(s, p, { c: 'trade', lots: 1 });
+    for (const t of new Set(mix)) {
+      const lv = me.tech[t].level;
+      if (lv >= 3) continue;
+      const c = TECH_COST[lv - 1];
+      if (me.gems >= c.gems && me.gold >= c.gold + 300) applyCommand(s, p, { c: 'tech', troop: t, branch: BOT_BRANCH[t] });
+    }
+    const next = me.barracks < MAX_BARRACKS ? BARRACKS[me.barracks] : undefined;
+    if (next && me.gems >= next.gems && me.gold >= next.gold + 600) applyCommand(s, p, { c: 'barracks' });
   }
 }

@@ -1,5 +1,5 @@
 import {
-  MAPS, UNIT_DEFS, isFixedType, type AbilityId, type GameState, type PlayerId, type Unit,
+  MAPS, UNIT_DEFS, branchOf, isFixedType, type AbilityId, type GameState, type PlayerId, type Unit,
 } from '@burgwacht/shared';
 import { applyDamage } from './combat';
 import { moveToward } from './movement';
@@ -80,22 +80,34 @@ export function stepAbilities(s: GameState, dt: number): void {
 
     if (def.special === 'heal') {
       if (u.cd > 0) u.cd -= dt;
+      if (u.t2 > 0) u.t2 -= dt; // revival recharge
       const order = u.order.kind;
       if (order === 'move' || order === 'retreat') continue; // stepMovement walks
+      const br = branchOf('healer', u.branch);
       const hurt = woundedFriends(s, u, def.range);
-      if (hurt.length && u.cd <= 0) {
+      if (hurt.length && u.cd <= 0) { // heal the one who needs it most; the people standing next to him get a smaller dose
+        const first = hurt.reduce((b, o) => (o.hp / o.maxHp < b.hp / b.maxHp - 1e-9 ? o : b));
         u.cd = def.cooldown; u.anim = 2;
-        for (const o of woundedFriends(s, u, def.areaRadius!)) {
-          const amt = Math.min(def.power!, o.maxHp - o.hp);
+        u.facing = Math.atan2(first.y - u.y, first.x - u.x);
+        const big = def.power! * 2.2 * (br === 'aura' ? 1.3 : 1) * (u.level >= 2 ? 1 + 0.15 * (u.level - 1) : 1);
+        for (const o of woundedFriends(s, first, 4).concat(first.hp < first.maxHp ? [first] : [])) {
+          const amt = Math.min(o === first ? big : big * 0.35, o.maxHp - o.hp);
+          if (amt <= 0) continue;
           o.hp += amt;
           pushEvent(s, { k: 'heal', x: o.x, y: o.y, amt: Math.round(amt) });
         }
       } else if (!hurt.length && order !== 'hold') {
         const far = woundedFriends(s, u, 30)
           .sort((a, b) => dist(u, a) - dist(u, b) || a.id - b.id)[0];
-        if (far) moveToward(u, far.x, far.y, dt);
-        else if (dist(u, { x: u.postX, y: u.postY }) > 1.5) moveToward(u, u.postX, u.postY, dt);
+        if (far) moveToward(u, far.x, far.y, dt, u.slow > 0 ? 0.6 : 1);
+        else if (dist(u, { x: u.postX, y: u.postY }) > 1.5) moveToward(u, u.postX, u.postY, dt, u.slow > 0 ? 0.6 : 1);
         else if (u.anim === 1) u.anim = 0;
+      }
+      if (br === 'aura') { // healing aura: everybody close by mends all the time
+        const rate = 0.012 * (u.level >= 3 ? 1.6 : 1) * dt;
+        gridOf(s).near(u.x, u.y, def.areaRadius! + 1, o => {
+          if (o.hp > 0 && o.hp < o.maxHp && o.side === u.side && !isFixedType(o.type) && dist(o, u) <= def.areaRadius!) o.hp = Math.min(o.maxHp, o.hp + o.maxHp * rate);
+        });
       }
     }
   }

@@ -1,5 +1,5 @@
 import {
-  DEFAULT_MAP, MAPS, WAVES, toWire, type ClientMsg, type PlayerId, type ServerMsg, type Snapshot,
+  DEFAULT_MAP, MAPS, PROTOCOL_VERSION, WAVES, toWire, type ClientMsg, type PlayerId, type ServerMsg, type Snapshot,
 } from '@burgwacht/shared';
 import { applyCommand, createGame, tick } from '../sim';
 import type { GameState } from '@burgwacht/shared';
@@ -46,7 +46,7 @@ export class Room {
     this.sockets[seat] = ws;
     this.away[seat] = false;
     this.lastActive = Date.now();
-    this.send(ws, { t: 'joined', code: this.code, you: seat, token: this.tokens[seat], mapId: this.state.mapId });
+    this.send(ws, { t: 'joined', code: this.code, you: seat, token: this.tokens[seat], mapId: this.state.mapId, v: PROTOCOL_VERSION });
     this.broadcast({ t: 'peer', connected: this.connected });
     if (this.connected) this.everFull = true;
     this.sendSnapshot();
@@ -99,9 +99,9 @@ export class Room {
       units: s.units.map(u => ({
         id: u.id, type: u.type, side: u.side, owner: u.owner, x: +u.x.toFixed(2), y: +u.y.toFixed(2),
         hp: Math.max(0, Math.round(u.hp)), maxHp: Math.round(u.maxHp), facing: +u.facing.toFixed(2),
-        anim: u.anim, level: u.level, squad: u.squad,
+        anim: u.anim, level: u.level, squad: u.squad, branch: u.branch, burning: u.burn > 0, slowed: u.slow > 0,
       })),
-      zones: s.zones.map(z => ({ p: +z.progress.toFixed(3), o: z.owner === 'enemy' ? 1 as const : 0 as const })),
+      zones: s.zones.map(z => ({ p: +z.progress.toFixed(3), o: z.owner === 'enemy' ? 1 as const : 0 as const, h: +z.hold.toFixed(1) })),
       events: s.events,
       paused: this.paused,
     };

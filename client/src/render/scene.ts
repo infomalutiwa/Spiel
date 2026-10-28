@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { onViewport, viewportSize } from '../viewport';
 import type { MapDef, MapTheme } from '@burgwacht/shared';
 import { PAL } from './palette';
 import { loadModel, modelInstance } from './assets';
@@ -72,9 +73,10 @@ export class World {
     this.look = LOOKS[map.theme];
     // phones: fewer pixels, no MSAA on dense screens, smaller shadow map – keeps hundreds of units smooth
     const phone = matchMedia('(pointer: coarse)').matches;
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: !(phone && devicePixelRatio >= 2), powerPreference: 'high-performance' });
-    this.renderer.setPixelRatio(Math.min(devicePixelRatio, phone ? 1.5 : 2));
-    this.renderer.shadowMap.enabled = true;
+    const lowQ = this.lowQ = new URLSearchParams(location.search).get('q') === 'low'; // ?q=low: no shadows, few pixels (slow devices, software-rendered test browsers)
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: !lowQ && !(phone && devicePixelRatio >= 2), powerPreference: 'high-performance' });
+    this.renderer.setPixelRatio(lowQ ? 0.6 : Math.min(devicePixelRatio, phone ? 1.5 : 2));
+    this.renderer.shadowMap.enabled = !lowQ;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = this.look.exposure;
@@ -98,14 +100,19 @@ export class World {
     this.night.rebuild(map);
     this.resize();
     addEventListener('resize', () => this.resize());
+    onViewport(() => this.resize());
   }
+
+  /** ?q=low: no shadows, no scenery – for slow devices and software-rendered test browsers */
+  readonly lowQ: boolean = false;
 
   private build() {
     const map = this.map;
     this.target.set(map.castle.x + 30, 0, map.castle.y);
     this.buildTerrain();
-    void this.buildDecor(this.content);
+    if (!this.lowQ) void this.buildDecor(this.content);
     void this.buildCastle(this.content);
+    this.buildBarracks(this.content);
     this.buildClouds();
     this.buildPollen();
   }
@@ -133,7 +140,7 @@ export class World {
   }
 
   resize() {
-    const w = this.canvas.clientWidth || innerWidth, h = this.canvas.clientHeight || innerHeight;
+    const vp = viewportSize(), w = vp.w || this.canvas.clientWidth || innerWidth, h = vp.h || this.canvas.clientHeight || innerHeight;
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
@@ -408,6 +415,32 @@ export class World {
       ...[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([sx, sz]) => place('hex/building_tower_A_blue', 6.4, sx * 12.5, sz * 12.5, Math.atan2(sx, sz))),
       ...[[13.5, -6], [13.5, 6]].map(([x, z]) => place('hex/building_tower_catapult_blue', 5.4, x, z, Math.PI / 2)),
     ]);
+  }
+
+  /** one barracks per player beside the keep; its size grows with the barracks level, troops walk out of the door */
+  private barracks: (THREE.Group | undefined)[] = [];
+  private barracksLevel = [0, 0];
+  private buildBarracks(into: THREE.Group) {
+    this.barracks = [];
+    this.barracksLevel = [0, 0];
+    this.map.barracks.forEach((b, p) => {
+      const g = new THREE.Group();
+      g.position.set(b.x, 0, b.y);
+      into.add(g); this.barracks[p] = g;
+      void modelInstance(`hex/building_barracks_${p === 0 ? 'blue' : 'red'}`, 9.5).then(o => {
+        if (!o) return;
+        o.rotation.y = Math.PI / 2; g.add(o);
+      });
+      void modelInstance('hex/tent', 4.4).then(o => { if (o) { o.position.set(-1, 0, p === 0 ? -7 : 7); g.add(o); } });
+    });
+  }
+  /** called every frame with the players' barracks levels: a taller building and more banners per level */
+  setBarracksLevel(levels: number[]) {
+    levels.forEach((lv, p) => {
+      if (this.barracksLevel[p] === lv || !this.barracks[p]) return;
+      this.barracksLevel[p] = lv;
+      this.barracks[p]!.scale.setScalar(1 + 0.07 * (lv - 1));
+    });
   }
 
   private buildClouds() {

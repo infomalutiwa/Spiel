@@ -101,3 +101,10 @@ Jedes Paket ist für sich spielbar und wird auf den Branch gepusht.
 1. Ressourcen: nur Gold, oder zusätzlich Holz/Stein?
 2. Soll die Bergfestung das erste große Paket nach der Stabilität sein, oder lieber erst Kaserne/Upgrades?
 3. Gleichzeitiges Bauen: dürfen beide Spieler dasselbe Gebäude upgraden (gemeinsame Kasse) oder hat jeder eine eigene Kasse?
+
+## 14. Entscheidungen (Antworten auf Abschnitt 13) und Umsetzungsstand
+
+- **Ressourcen:** Gold, **Stein** (Katapult-Munition, 3 pro Schuss; pro Welle ein Einkommen, gegen Gold tauschbar) und **Edelsteine** (selten, Upgrades). Alles steht in `shared/src/data/economy.ts`.
+- **Kassen:** Jede Spielerin hat eine **eigene** Kasse (Gold, Stein, Edelsteine, Kaserne-Stufe, Truppen-Upgrades). Nur die Burg und die Mauern gehören beiden.
+- **Umgesetzt (Branch `claude/game-brainstorm-friends-9a7zro`):** Paket A (iPhone-Layout, Nachkaufen im Kampf, Belagerungspause nach Zonenfall), Wirtschaft, Katapult mit Flächenschaden und Flugbahn, Truppenlogik (Halten / Angriff ohne Ziel, Kiten, Spott, Heiler), Kaserne-Stufen mit Ausbildungsschlange, Truppen-Level 1–3 mit Zweigen (Feuerpfeile u. a.), 25 Wellen als Marschkolonnen mit Bossen, Balance-Matrix (`server/scripts/balance.ts`).
+- **Noch offen:** Ballista (Modell vorhanden, noch keine Truppe), Schmiede / Lazarett / Mine als Bauplätze (Paket D), Pfad-Karten und Bergfestung (Paket E), weitere Modi (F), neue Modelle und Texturen (G), echte WebKit-Tests (hier nur Chromium mit iPhone-Emulation und Touch).

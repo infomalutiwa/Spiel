@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { UNIT_DEFS, deckAt, deckHeight, isStructureType, rangedOnWall, type PlayerId, type UnitSnap, type UnitType } from '@burgwacht/shared';
+import { TROOPS, UNIT_DEFS, deckAt, deckHeight, isStructureType, rangedOnWall, type PlayerId, type UnitSnap, type UnitType } from '@burgwacht/shared';
 import { PAL } from './palette';
 import { loadBaked, type BakedModel, type Clip } from './baked';
 import { modelInstance } from './assets';
@@ -9,7 +9,7 @@ import type { World } from './scene';
 /** world scale of each baked character (the packs ship at roughly human size) */
 const SCALE: Partial<Record<UnitType, number>> = {
   knight: 1.45, spearman: 1.45, archer: 1.4, crossbowman: 1.4, mage: 1.4, healer: 1.4, cavalry: 1.5,
-  footman: 1.4, raider_archer: 1.4, shaman: 1.45, brute: 2.1, raider_rider: 1.5, ironguard: 1.5,
+  footman: 1.4, raider_archer: 1.4, shaman: 1.45, brute: 2.1, raider_rider: 1.5, ironguard: 1.5, warlord: 3.0,
 };
 /** kinds that stay as cloned scene objects (few of them, unanimated models) */
 const OBJECT_MODELS: Partial<Record<UnitType, { file: string; size: number }>> = {
@@ -19,8 +19,13 @@ const TINT: Record<string, THREE.Color> = {
   p0: new THREE.Color(0.8, 0.95, 1.3), p1: new THREE.Color(1.3, 0.85, 0.95), enemy: new THREE.Color(1, 1, 1),
 };
 const HEALER_TINT = new THREE.Color(1.5, 1.55, 1.3);
+const WARLORD_TINT = new THREE.Color(1.5, 0.62, 0.55);
+const FROST = new THREE.Color(0.55, 0.85, 1.4);
+/** cape colour by upgrade branch (0 = a plain level-2 cape in the team colour family) */
+const BRANCH_CAPE = [new THREE.Color('#8a6b4a'), new THREE.Color('#e0592f'), new THREE.Color('#3f7fe0')];
+const PLUME_SILVER = new THREE.Color('#dfe6ee'), PLUME_GOLD = new THREE.Color('#ffcf3d');
 
-const MODEL_ID = (t: UnitType) => t;
+const MODEL_ID = (t: UnitType): string => (t === 'warlord' ? 'brute' : t); // the boss is a very big, very angry brute
 const FRAME_CAP = 96; // initial instances per frame bucket; grows on demand
 
 interface View {
@@ -93,6 +98,10 @@ export class UnitViews {
   private pips: THREE.InstancedMesh;
   private poles: THREE.InstancedMesh;
   private cloths: THREE.InstancedMesh;
+  private capes: THREE.InstancedMesh;
+  private plumes: THREE.InstancedMesh;
+  /** burning units this frame (effects.ts draws flames on them) */
+  burning: { x: number; y: number; h: number }[] = [];
   private hover: THREE.Mesh;
   private t = 0;
   private tmpM = new THREE.Matrix4();
@@ -122,6 +131,10 @@ export class UnitViews {
     this.poles = inst(new THREE.CylinderGeometry(0.05, 0.06, 1, 5), new THREE.MeshStandardMaterial({ color: '#6b4a2b', roughness: 0.9 }), 64);
     this.cloths = inst(new THREE.PlaneGeometry(1.5, 0.95, 4, 1), new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.85, side: THREE.DoubleSide }), 64);
     this.poles.castShadow = true; this.cloths.castShadow = true;
+    // upgraded troops: a cape in the branch colour and a helmet plume (silver level 2, gold level 3)
+    this.capes = inst(new THREE.PlaneGeometry(0.85, 1.2), new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.9, side: THREE.DoubleSide }), 900);
+    this.plumes = inst(new THREE.ConeGeometry(0.2, 0.62, 6), new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.45, metalness: 0.35 }), 900);
+    this.capes.castShadow = true;
     this.hover = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.8, depthWrite: false, side: THREE.DoubleSide }));
     this.hover.rotation.x = -Math.PI / 2; this.hover.visible = false; this.hover.renderOrder = 6;
     this.group.add(this.hover);
@@ -150,6 +163,7 @@ export class UnitViews {
 
   private tintFor(u: { type: UnitType; side: UnitSnap['side']; owner: PlayerId | null }, you: PlayerId): THREE.Color {
     if (u.type === 'healer') return HEALER_TINT;
+    if (u.type === 'warlord') return WARLORD_TINT;
     return u.side === 'enemy' ? TINT.enemy : TINT[`p${u.owner ?? you}`];
   }
 
@@ -191,7 +205,8 @@ export class UnitViews {
   private draw(you: PlayerId, selected: Set<number>, dt: number) {
     for (const b of this.models.values()) b.begin();
     const m = this.tmpM, q = this.tmpQ, s = this.tmpS, p = this.tmpP, col = this.tmpC;
-    let nTeam = 0, nSel = 0, nBar = 0, nPip = 0, nBan = 0;
+    let nTeam = 0, nSel = 0, nBar = 0, nPip = 0, nBan = 0, nCape = 0;
+    this.burning.length = 0;
     const camQ = this.world.camera.quaternion;
     const crowns = [...this.views.values()].map(v => v.snap).filter(u => u.type === 'wall' || u.type === 'tower');
     const barScale = Math.min(3, Math.max(1, this.world.dist / 55));
@@ -210,7 +225,8 @@ export class UnitViews {
       if (v.attackT > 0) v.attackT -= dt;
       if (v.flashT > 0) v.flashT -= dt;
       const jit = hash01(u.id), jit2 = hash01(u.id * 7 + 3), leader = u.squad > 0 && u.squad === u.id;
-      const sc = (SCALE[u.type] ?? 1) * (0.55 + 0.45 * v.spawnT) * (0.93 + 0.14 * jit) * (leader ? 1.07 : 1);
+      const isTroop = u.owner !== null && u.side === 'player' && Object.hasOwn(TROOPS, u.type);
+      const sc = (SCALE[u.type] ?? 1) * (0.55 + 0.45 * v.spawnT) * (0.93 + 0.14 * jit) * (leader ? 1.07 : 1) * (isTroop ? 1 + 0.05 * (u.level - 1) : 1);
       const structure = isStructureType(u.type);
       if (u.side === 'player' && u.owner !== null && rangedOnWall(u.type)) { // marksmen on a wall crown stand on top of it
         const d = deckAt(crowns, v.px, v.py);
@@ -229,8 +245,24 @@ export class UnitViews {
         col.copy(this.tintFor(u, you));
         col.r *= 0.93 + 0.14 * jit; col.g *= 0.93 + 0.14 * jit2; col.b *= 0.93 + 0.14 * hash01(u.id * 13 + 1); // every soldier a slightly different shade
         if (v.flashT > 0) col.multiplyScalar(2.2);
+        if (isTroop && u.level >= 2) col.multiplyScalar(u.level >= 3 ? 1.16 : 1.07); // veterans stand out a little brighter
+        if (u.slowed) col.lerp(FROST, 0.45);
         baked.add(frame, m, col);
+        if (isTroop && u.level >= 2 && nCape < 900) { // cape + plume
+          const hh = (baked.model.height ?? 3) * sc;
+          const fx = Math.sin(v.yaw), fz = Math.cos(v.yaw);
+          q.setFromAxisAngle(this.up, v.yaw); const tilt = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -0.18 - (moving ? 0.15 : 0));
+          q.multiply(tilt); s.set(sc * 0.9, sc * 0.9, sc * 0.9);
+          m.compose(this.tmpP2.set(v.px - fx * 0.32 * sc, y + hh * 0.5, v.py - fz * 0.32 * sc), q, s);
+          this.capes.setMatrixAt(nCape, m); this.capes.setColorAt(nCape, BRANCH_CAPE[u.branch] ?? BRANCH_CAPE[0]);
+          q.setFromAxisAngle(this.up, 0); s.setScalar(sc * (u.level >= 3 ? 1.25 : 0.95));
+          m.compose(this.tmpP2.set(v.px, y + hh * 0.97, v.py), q, s);
+          this.plumes.setMatrixAt(nCape, m); this.plumes.setColorAt(nCape, u.level >= 3 ? PLUME_GOLD : PLUME_SILVER);
+          nCape++;
+        }
+        if (u.burning) this.burning.push({ x: v.px, y: v.py, h: v.lift + ((baked.model.height ?? 3) * sc) * 0.4 });
       } else if (v.obj) {
+        if (u.burning) this.burning.push({ x: v.px, y: v.py, h: 1.5 });
         v.obj.position.copy(p); v.obj.rotation.y = v.yaw + Math.PI / 2 * 0; v.obj.scale.setScalar(0.55 + 0.45 * v.spawnT);
         if (moving) v.obj.position.y += Math.abs(Math.sin(this.t * 6 + v.id)) * 0.05;
       }
@@ -310,7 +342,7 @@ export class UnitViews {
       if (w.t > 2) { this.group.remove(w.obj); this.wrecks.splice(i, 1); }
     }
     for (const b of this.models.values()) b.end();
-    for (const [im, n] of [[this.teamRings, nTeam], [this.selRings, nSel], [this.barBg, nBar], [this.barFill, nBar], [this.pips, nPip], [this.poles, nBan], [this.cloths, nBan]] as const) {
+    for (const [im, n] of [[this.teamRings, nTeam], [this.selRings, nSel], [this.barBg, nBar], [this.barFill, nBar], [this.pips, nPip], [this.poles, nBan], [this.cloths, nBan], [this.capes, nCape], [this.plumes, nCape]] as const) {
       im.count = n; im.visible = n > 0;
       im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true;
     }

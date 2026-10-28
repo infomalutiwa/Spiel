@@ -1,6 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { gzipSync } from 'node:zlib';
+import { createHash } from 'node:crypto';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer, type WebSocket } from 'ws';
@@ -21,7 +22,7 @@ const send = (req: IncomingMessage, res: ServerResponse, file: string, data: Buf
   const gz = COMPRESSIBLE.has(extname(file)) && data.length > 1024 && /\bgzip\b/.test(String(req.headers['accept-encoding'] ?? ''));
   const headers: Record<string, string> = { 'content-type': type, 'cache-control': file.includes('/assets/') && !file.endsWith('index.html') ? 'public, max-age=3600' : 'no-cache' };
   if (!gz) { res.writeHead(200, headers); return res.end(data); }
-  const key = `${data.length}:${data[0]}:${data[data.length - 1]}:${data[data.length >> 1]}`; // cheap content fingerprint: a rebuild never serves stale bytes
+  const key = createHash('sha1').update(data).digest('hex'); // content fingerprint: a rebuild never serves stale bytes (hashed asset names keep the length equal!)
   let z = gzCache.get(file)?.z;
   if (!z || gzCache.get(file)!.key !== key) { z = gzipSync(data, { level: 6 }); if (gzCache.size < 400) gzCache.set(file, { key, z }); }
   res.writeHead(200, { ...headers, 'content-encoding': 'gzip', vary: 'accept-encoding' });

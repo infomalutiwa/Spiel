@@ -9,4 +9,6 @@ export const DAMAGE_VS_ARMOR: Record<DamageKind, Record<ArmorKind, number>> = {
   bolt:   { light: 1.1, heavy: 1.1, mounted: 1.1, siege: 0.7, structure: 0.3 },
   magic:  { light: 1.0, heavy: 1.3, mounted: 1.0, siege: 1.0, structure: 0.6 },
   siege:  { light: 0.6, heavy: 0.9, mounted: 0.6, siege: 1.5, structure: 3.0 },
+  /** catapult stones: devastating against walls, rams and tight groups (the blast does the rest) */
+  boulder: { light: 1.0, heavy: 1.15, mounted: 1.0, siege: 1.7, structure: 2.5 },
 };

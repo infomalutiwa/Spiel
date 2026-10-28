@@ -170,7 +170,7 @@ export class Controls {
   private click(g: { x: number; y: number }, e: { shiftKey: boolean }) {
     const m = this.mode;
     if (m.k === 'buy') {
-      if (this.phase() !== 'prep') return this.cancel();
+      if (this.phase() !== 'prep' && this.phase() !== 'battle') return this.cancel();
       this.send({ c: 'buy', troop: m.troop, x: g.x, y: g.y }); audio.play('coins', 0.7);
       return;
     }
@@ -302,6 +302,9 @@ export class Controls {
     this.click(g, { shiftKey: false });
   }
 
+  /** "Angriff": no aiming – the selected troops go for the nearest enemy */
+  attackNow() { if (this.selected.size && this.phase() === 'battle') this.send({ c: 'attack', ids: this.ids(), formation: this.formation }); }
+
   selectAll() {
     this.selected = new Set(this.snapshot()?.units.filter(u => u.owner === this.me() && u.type !== 'castle').map(u => u.id));
     this.onChange();
@@ -319,7 +322,7 @@ export class Controls {
       this.selected = new Set(this.snapshot()?.units.filter(u => u.owner === this.me() && u.type !== 'castle').map(u => u.id));
       this.onChange();
     }
-    else if (k === 'a' && battle && this.selected.size) this.setMode({ k: 'attackMove' });
+    else if (k === 'a' && battle && this.selected.size) this.attackNow();
     else if (k === 'h' && battle && this.selected.size) this.send({ c: 'hold', ids: this.ids() });
     else if (k === 'x' && battle && this.selected.size) this.send({ c: 'retreat', ids: this.ids() });
     else if (k === 'q' && battle) this.setMode({ k: 'ability', id: 'arrowRain' });

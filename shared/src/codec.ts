@@ -8,7 +8,7 @@ export const UNIT_TYPE_LIST: UnitType[] = [
   ...TROOP_ORDER, ...(Object.keys(ENEMIES) as UnitType[]), 'castle', ...STRUCTURE_TYPES,
 ];
 const TYPE_INDEX = new Map(UNIT_TYPE_LIST.map((t, i) => [t, i]));
-const REC = 17;
+const REC = 18;
 
 const toB64 = (u8: Uint8Array): string => {
   if (typeof Buffer !== 'undefined') return Buffer.from(u8.buffer, u8.byteOffset, u8.byteLength).toString('base64');
@@ -23,7 +23,7 @@ const fromB64 = (b: string): Uint8Array => {
   return out;
 };
 
-/** 17 bytes per unit instead of ~120 bytes of JSON */
+/** 18 bytes per unit instead of ~120 bytes of JSON (byte 17: upgrade branch, burning, slowed) */
 export function encodeUnits(units: UnitSnap[]): string {
   const buf = new ArrayBuffer(units.length * REC), dv = new DataView(buf);
   units.forEach((u, i) => {
@@ -39,6 +39,7 @@ export function encodeUnits(units: UnitSnap[]): string {
     const f = ((u.facing % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
     dv.setUint8(o + 14, Math.round((f / (Math.PI * 2)) * 255));
     dv.setUint16(o + 15, u.squad & 0xffff);
+    dv.setUint8(o + 17, (u.branch & 3) | (u.burning ? 4 : 0) | (u.slowed ? 8 : 0));
   });
   return toB64(new Uint8Array(buf));
 }
@@ -55,6 +56,7 @@ export function decodeUnits(b64: string): UnitSnap[] {
       x: dv.getUint16(o + 6) / 100, y: dv.getUint16(o + 8) / 100,
       hp: dv.getUint16(o + 10), maxHp: dv.getUint16(o + 12),
       facing: (dv.getUint8(o + 14) / 255) * Math.PI * 2, squad: dv.getUint16(o + 15),
+      branch: dv.getUint8(o + 17) & 3, burning: !!(dv.getUint8(o + 17) & 4), slowed: !!(dv.getUint8(o + 17) & 8),
     });
   }
   return out;

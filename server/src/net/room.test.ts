@@ -75,7 +75,7 @@ describe('Room', () => {
     r.join(fake()); r.join(fake());
     const s = r.snapshot();
     expect(Object.keys(s.units[0]).sort()).toEqual(
-      ['anim', 'facing', 'hp', 'id', 'level', 'maxHp', 'owner', 'side', 'squad', 'type', 'x', 'y']);
+      ['anim', 'branch', 'burning', 'facing', 'hp', 'id', 'level', 'maxHp', 'owner', 'side', 'slowed', 'squad', 'type', 'x', 'y']);
     expect(r.state.events.length).toBe(0);
   });
 });

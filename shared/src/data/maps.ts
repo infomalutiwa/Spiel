@@ -35,6 +35,7 @@ function fortress(o: FortOpts): MapDef {
     barriers,
     walls: barriers.flatMap((b, i) => wallLine(b, i, o.depth, o.towerEvery ?? 0)),
     zones: o.zones.map((z, i) => ({ id: i, ...z })),
+    barracks: [{ x: o.keep + 15, y: o.depth / 2 - 22 }, { x: o.keep + 15, y: o.depth / 2 + 22 }],
     placeZone: { x0: o.keep + 12, x1: o.outer.x + 3, y0: 14, y1: o.depth - 14 },
     decorSeed: o.decorSeed, waveScale: o.waveScale,
   };

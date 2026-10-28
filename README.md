@@ -49,26 +49,34 @@ Mit `ALLOWED_ORIGINS` (vom Skript gesetzt) akzeptiert der Server nur Verbindunge
 
 ## Spielablauf
 
-- **Aufstellphase** (40 s oder bis beide „Bereit" sind): Truppen werden als **Trupps** gekauft (10 Bogenschützen, 8 Speerträger, 6 Ritter, 5 Reiter, 6 Armbrustschützen, 4 Magier, 3 Heiler, 1 Katapult). Karte unten antippen, dann in den Hof tippen – oder bei Fernkämpfern auf die **goldene Mauerkrone**. Pro Spielerin gibt es **30 Armee-Plätze** (ein Katapult zählt drei). Oben seht ihr, was als Nächstes kommt.
+- **Aufstellphase** (40 s oder bis beide „Bereit" sind): Truppen werden als **Trupps** gekauft (10 Bogenschützen, 8 Speerträger, 6 Ritter, 5 Reiter, 6 Armbrustschützen, 4 Magier, 3 Heiler, 1 Katapult). Karte unten antippen, dann in den Hof tippen – oder bei Fernkämpfern auf die **goldene Mauerkrone**. Oben seht ihr, was als Nächstes kommt.
+- **Jede Spielerin hat ihre eigene Kasse:** 🪙 **Gold** (Trupps, Reparaturen, Mauern), 🪨 **Stein** (Katapult-Munition, 3 pro Schuss; gibt es jede Welle, im Shop gegen Gold tauschbar) und 💎 **Edelsteine** (selten: wenige pro Welle, mehr bei Boss-Wellen – bezahlen Truppen-Upgrades und hohe Kaserne-Stufen). Alle Zahlen stehen in `shared/src/data/economy.ts`.
+- **Kaserne:** Pro Spielerin eine eigene Kaserne neben der Burg. Stufe 1–5 erhöht die Armee-Plätze (30 → 40 → 55 → 75 → 100) und das Ausbildungstempo. **Im Kampf** könnt ihr jederzeit nachkaufen (Knopf „Ausbilden"): Die Trupps werden in der Kaserne ausgebildet (Warteschlange) und marschieren von dort nach vorn.
+- **Ausbau (⚒️):** Jede Truppenart hat Stufe 1–3. Auf Stufe 2 wählt ihr einen **Zweig** (z. B. Bogenschützen: *Feuerpfeile* mit Brandschaden über Zeit oder *Durchschlag*; Ritter: *Schildwall* oder *Berserker*; Magier: *Kettenblitz* oder *Frost* …). Höhere Stufen zeigen sich im Modell (Umhang in Zweigfarbe, Helmbusch silbern/golden).
 - **Die Festung:** zwei Mauerringe mit je einem Tor und Türmen. Gegner kommen nicht durch, solange Mauer und Tor stehen. Fußvolk greift das **Tor** an, **Rammen** und **Wurfmaschinen** auch Mauern und Türme. Mauer, Tor und Turm antippen: **verbessern** (Stufe 1–3), **reparieren** (auch im Kampf), **wiederaufbauen** (nur in der Aufstellphase).
 - **Mauerkrone:** Fernkämpfer auf einer Mauer oder einem Turm schießen 30 % weiter, treffen 10 % härter, haben Deckung gegen Fernkampf, und Schwertkämpfer kommen nicht an sie heran. Fällt das Mauerstück, stürzen sie hinunter.
-- **Katapulte** stehen hinter der Mauer und schießen über sie hinweg (Reichweite 30) – besonders gegen Rammen und Gruppen am Tor.
-- **Kontrollpunkte:** ① Vorhof, ② Schlossplatz, ③ Thronvorplatz. Die Gegner erobern sie der Reihe nach: Stehen mehr von ihnen als von euch in der Zone, füllt sich der Balken. Fällt der letzte Punkt oder die Burg, ist die Welle verloren. Zwischen den Wellen sind alle Punkte wieder frei, Trupps könnt ihr für Gold **auffüllen** (＋ am Trupp-Symbol).
-- **Kampf:** Trupps auswählen (Tippen, Box ziehen oder Trupp-Leiste links), bewegen, angreifen, Formation wählen. Nach jeder Welle gibt's Gold, die Truppen werden geheilt, die Gebäude flicken ein Drittel selbst. Überlebt ihr alle 12 Wellen, habt ihr gewonnen.
+- **Katapulte** stehen hinter der Mauer, werfen Steine im hohen Bogen (Flugzeit ≈ 1–2 s, sie führen sich bewegende Ziele vor) und richten **Flächenschaden** an – am meisten gegen Gruppen, Rammen und Belagerung. Sie zielen auf die dichteste Gruppe, treffen nichts näher als 12 und schießen ohne Stein nicht (Hinweis „Kein Stein!").
+- **Kontrollpunkte:** ① Vorhof, ② Schlossplatz, ③ Thronvorplatz. Die Gegner erobern sie der Reihe nach: Stehen mehr von ihnen als von euch in der Zone, füllt sich der Balken. Fällt der letzte Punkt oder die Burg, ist die Welle verloren. **Fällt eine Zone, machen die Angreifer eine Belagerungspause** (≈ 22 s) – dann läuft das **Notaufgebot**: Die Kaserne bildet 2,5× so schnell aus. Zwischen den Wellen sind alle Punkte wieder frei, Trupps könnt ihr für Gold **auffüllen** (＋ am Trupp-Symbol, auch im Kampf).
+- **Wellen:** 25 Wellen als **Marschkolonnen** – Reiter-Späher, Fußvolk, Bogenschützen, Schwere, Schamanen, Belagerung treffen gestaffelt über 30–60 s ein. Jede fünfte Welle bringt einen **Boss** (Kriegsherr) und mehr Edelsteine.
+- **Kampf:** Trupps auswählen (Tippen, Box ziehen oder Trupp-Leiste links), bewegen, angreifen, Formation wählen. Nach jeder Welle gibt's Gold, Stein und Edelsteine, die Truppen werden geheilt, die Gebäude flicken ein Drittel selbst.
 
 ### Rollen und Mechaniken
 
-- **Reiter:** Sturmangriff aus dem Anlauf (≈ 1 s Laufen) richtet über doppelten Schaden an, im **Keil** (`2`) noch mehr. Sie jagen Bogenschützen, Magier und Heiler – die Reserve im Hof, wenn der Feind durchbricht.
-- **Speerträger:** In **Halten** (`H`) bilden sie einen Speerwall am Tor, der Reiter fast ganz abprallen lässt.
-- **Bogenschützen:** weichen beim Nachladen zurück, schießen in der **Linie** (`1`) 15 % härter. Schwere Rüstung (Eisenwachen, Grobiane) macht ihnen zu schaffen – dafür sind **Armbrust** und **Magier** da.
-- **Block** (`3`): Nahkämpfer nehmen 15 % weniger Schaden.
-- Gegner werden mit jeder Welle zahlreicher und ab Welle 4 und 7 erfahrener (Sterne über dem Kopf); wer zu lange herumsteht, bekommt Besuch von Eisenwachen, Rammen und Schamanen.
+Alle Truppenwerte und Rollen sind in `shared/src/data/troops.ts` dokumentiert.
+
+- **Angriff:** Ein Tipp auf „Angriff" (`A`) schickt die gewählten Trupps gegen die nächste Gegner-Front – ohne Ziel antippen. **Halten** (`H`): Die Trupps bleiben dauerhaft stehen, rücken nie nach (auch nicht in der nächsten Welle) und schießen / schlagen nur, was in Reichweite kommt.
+- **Ritter** spotten: Gegnerische Nahkämpfer in der Nähe greifen lieber sie an. Im **Block** (`3`) nehmen sie 15 % weniger Schaden.
+- **Bogenschützen / Armbrust / Magier** halten Abstand zu Nahkämpfern („schießen und weichen", nicht in *Halten*) und wählen das verwundbarste Ziel (Schamanen, Heiler, Verwundete); Magier zielen auf die dichteste Gruppe. Schwere Rüstung macht ihnen zu schaffen – dafür sind **Armbrust** und **Magier** da.
+- **Heiler** heilen zuerst den am stärksten Verwundeten in Reichweite, Umstehende ein wenig mit.
+- **Reiter:** Sturmangriff aus dem Anlauf richtet über doppelten Schaden an, im **Keil** (`2`) noch mehr. Sie schwingen in die Flanke aus und jagen Bogenschützen, Magier und Heiler.
+- **Speerträger:** Auf *Halten* bilden sie einen Speerwall, der Reiter fast ganz abprallen lässt, und suchen sich Reiter als Ziel.
+- Gegner werden mit jeder Welle zahlreicher, zäher und erfahrener (Sterne über dem Kopf); wer zu lange herumsteht, bekommt Besuch von Eisenwachen, Rammen und Schamanen.
 
 | Taste | Aktion |
 |---|---|
 | Klick / Box ziehen / Doppelklick | auswählen |
 | Rechtsklick | bewegen · Feind anklicken = Ziel angreifen · in der Aufstellphase: platzieren |
-| `A` + Klick | Angriffsmarsch |
+| `A` | Angriff auf die nächste Gegner-Front (ohne Ziel) |
 | `H` / `X` | Position halten / Rückzug |
 | `1` `2` `3` | Formation Linie / Keil / Block |
 | `Q` / `E` | Pfeilregen / Anfeuern (Fähigkeit, Ziel anklicken) |
@@ -95,10 +103,11 @@ Wellen und Karten sind reine Datendateien in `shared/src/data/`.
 npm test                      # Simulation, Server-Räume, Daten, Interpolation, Balance
 npm run dev                   # in einem zweiten Terminal …
 node e2e/smoke.mjs            # … Zwei-Fenster-Test (braucht playwright + Chromium)
-npx tsx server/scripts/balance.ts   # Balance-Bericht mit Beispiel-Armeen
+npx tsx server/scripts/balance.ts   # Balance-Matrix: Mono-Armeen und Mischungen gegen alle Wellen (Optionen siehe Kopf der Datei)
+NODE_PATH=$(npm root -g) node e2e/mobile.mjs   # iPhone-Test: Touch-Taps und Erreichbarkeit aller Knöpfe bei 844×390, 667×375, 932×430
 ```
 
-`?gallery` an die Client-URL hängen zeigt alle Truppen- und Gegnermodelle nebeneinander.
+`?q=low` an die Client-URL hängen schaltet Schatten und Kulissen ab (langsame Geräte, Testbrowser ohne GPU). `?gallery` an die Client-URL hängen zeigt alle Truppen- und Gegnermodelle nebeneinander.
 
 ## Grafik
 

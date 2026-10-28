@@ -26,11 +26,11 @@ const until = async (p, fn, ms = 30000) => {
 };
 
 const a = await open(), b = await open();
-await a.goto(BASE); await jsClick(a, '#create');
+await a.goto(`${BASE}/?q=low`); await jsClick(a, '#create');
 await a.waitForSelector('.bigcode');
 const code = (await a.textContent('.bigcode')).trim();
 check(/^[A-Z]{4}$/.test(code), `room code ${code}`);
-await b.goto(`${BASE}/?room=${code}`); await jsClick(b, '#join');
+await b.goto(`${BASE}/?q=low&room=${code}`); await jsClick(b, '#join');
 check(await until(a, s => s && !s.paused), 'both players connected, game running');
 
 const buy = (p, list) => p.evaluate(l => l.forEach(([t, x, y]) => window.__bw.conn.cmd({ c: 'buy', troop: t, x, y })), list);
@@ -51,6 +51,12 @@ check((await c.textContent('.err')).includes('voll'), 'third player is rejected 
 await a.keyboard.press('Space'); await b.keyboard.press('Space');
 check(await until(a, s => s.phase === 'battle'), 'battle starts when both are ready');
 check(await until(a, s => s.units.some(u => u.side === 'enemy')), 'enemy wave spawns');
+
+// reinforcements in battle: the squad is queued in the barracks, trained, and walks out
+await a.evaluate(([x, y]) => window.__bw.conn.cmd({ c: 'buy', troop: 'spearman', x, y }), [bx - 10, gy + 6]);
+check(await until(a, s => s.players[0].queue.length === 1), 'a squad bought in battle goes to the barracks queue');
+check(await until(a, s => s.players[0].queue.length === 0 && s.units.filter(u => u.owner === 0 && u.type === 'spearman').length === 8, 60000), 'the squad is trained and appears');
+check(await until(a, s => s.players[0].stone > 0 && s.players[1].gems >= 0 && s.players[0].barracks === 1), 'every player has their own stone, gems and barracks level');
 
 // one player drops and rejoins: game pauses, seat is restored
 await b.reload();

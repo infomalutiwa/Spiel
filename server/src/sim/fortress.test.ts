@@ -119,11 +119,11 @@ describe('the gate, breaches and capture points', () => {
   });
   it('zones are freed again between waves', () => {
     const s = fortressBattle();
-    s.zones[0] = { owner: 'enemy', progress: 1, reached: true };
+    s.zones[0] = { owner: 'enemy', progress: 1, reached: true, hold: 5 };
     s.spawnQueue = [];
     tick(s);
     expect(s.phase).toBe('prep');
-    expect(s.zones[0]).toEqual({ owner: 'player', progress: 0, reached: false });
+    expect(s.zones[0]).toEqual({ owner: 'player', progress: 0, reached: false, hold: 0 });
   });
 });
 

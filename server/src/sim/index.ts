@@ -6,3 +6,4 @@ export * from './abilities';
 export * from './waves';
 export * from './movement';
 export * from './fortress';
+export * from './training';

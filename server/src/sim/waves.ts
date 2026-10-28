@@ -1,5 +1,5 @@
 import {
-  ENEMIES, MAPS, PREP_TIME, WAVES, waveReward, type GameState, type Phase,
+  COLUMN_OFFSET, ENEMIES, groupCount, MAPS, PREP_TIME, WAVES, gemReward, waveSpread, stoneReward, waveReward, type GameState, type Phase,
 } from '@burgwacht/shared';
 import { isFixedType } from '@burgwacht/shared';
 import { castleOf, pushEvent, rand, spawnUnit } from './state';
@@ -12,15 +12,18 @@ function setPhase(s: GameState, phase: Phase) {
 function startBattle(s: GameState) {
   const wave = WAVES[s.wave];
   s.spawnQueue = [];
+  s.shells = [];
   s.battleTime = 0;
   s.lastSpawn = 0;
-  const scale = MAPS[s.mapId].waveScale * (0.8 + 0.055 * s.wave); // gentle start, growing pressure as both armies fill up
+  const spread = waveSpread(s.wave);
   for (const g of wave.groups) {
-    const n = Math.max(1, Math.round(g.count * scale));
-    // big groups arrive in a stream, not a lump: the whole group takes ~14 s to file in
-    const gap = Math.min(0.55, 14 / n);
+    const n = groupCount(MAPS[s.mapId].waveScale, s.wave, g); // gentle start, growing pressure as both armies fill up
+    // a march column, not a lump: every type leaves the gate at its own point of the column (scouts, foot, bowmen,
+    // heavies, siege) and a group files in over a window that grows with its size
+    const start = COLUMN_OFFSET[g.type] * spread + (g.delay ?? 0);
+    const window = Math.min(22, Math.max(4, n * 0.6));
     for (let i = 0; i < n; i++)
-      s.spawnQueue.push({ at: (g.delay ?? 0) + i * gap, type: g.type, lane: g.lane });
+      s.spawnQueue.push({ at: start + (i * window) / n, type: g.type, lane: g.lane });
   }
   s.spawnQueue.sort((a, b) => a.at - b.at);
   for (const p of s.players) p.ready = false;
@@ -30,12 +33,13 @@ function startBattle(s: GameState) {
 
 function endBattle(s: GameState) {
   const reward = waveReward(s.wave);
-  for (const p of s.players) p.gold += reward;
-  s.zones.forEach(z => { z.owner = 'player'; z.progress = 0; z.reached = false; });
+  for (const p of s.players) { p.gold += reward; p.stone += stoneReward(s.wave); p.gems += gemReward(s.wave, WAVES.length); }
+  s.zones.forEach(z => { z.owner = 'player'; z.progress = 0; z.reached = false; z.hold = 0; });
   for (const u of s.units) { // a night's rest between waves; buildings mend a third of the damage on their own
     if (isFixedType(u.type)) { if (u.type !== 'castle') u.hp = Math.min(u.maxHp, u.hp + (u.maxHp - u.hp) * 0.35); continue; }
-    u.hp = u.maxHp; u.morale = 100; u.routed = 0; u.cd = 0; u.targetId = null;
-    u.order = { kind: 'idle', x: u.x, y: u.y }; u.postX = u.x; u.postY = u.y;
+    u.hp = u.maxHp; u.morale = 100; u.routed = 0; u.cd = 0; u.targetId = null; u.burn = 0; u.slow = 0;
+    if (u.order.kind !== 'hold') u.order = { kind: 'idle', x: u.x, y: u.y }; // holding position survives the night
+    u.postX = u.x; u.postY = u.y;
   }
   const castle = castleOf(s);
   if (castle) castle.hp = Math.min(castle.maxHp, castle.hp + castle.maxHp * 0.2);
@@ -63,8 +67,8 @@ export function stepWaves(s: GameState, dt: number): void {
     const u = spawnUnit(s, 'enemy', null, it.type, sp.x + (rand(s) - 0.5) * 9, sp.y + (rand(s) - 0.5) * 9, it.lane);
     u.order = { kind: 'attackMove', x: sp.x - 20, y: sp.y }; // stepRoutes steers from here
     // later waves arrive battle-hardened: tougher and harder-hitting (stars over their heads)
-    u.level = 1 + Math.min(2, Math.floor(s.wave / 3));
-    u.maxHp = u.hp = ENEMIES[it.type].hp * (1 + 0.15 * (u.level - 1));
+    u.level = 1 + Math.min(2, Math.floor(s.wave / 8));
+    u.maxHp = u.hp = ENEMIES[it.type].hp * (1 + 0.15 * (u.level - 1)) * (1 + 0.06 * s.wave);
     s.lastSpawn = s.battleTime;
   }
   if (!s.spawnQueue.length && !s.units.some(u => u.side === 'enemy' && u.hp > 0)) endBattle(s);

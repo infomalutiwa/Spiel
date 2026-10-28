@@ -12,6 +12,8 @@ import { showGallery } from './gallery';
 import { audio } from './audio';
 import { standalone } from './pwa';
 import { initA11y } from './a11y';
+import { initViewport } from './viewport';
+initViewport();
 initA11y();
 
 const canvas = document.getElementById('c') as HTMLCanvasElement;
@@ -39,6 +41,7 @@ function loop(now: number) {
     views.sync(ip, conn.you, controls.selected, dt);
     fortress.sync(ip?.b.units ?? [], s?.zones, dt);
     fortress.showCrown(s?.phase === 'prep');
+    if (s) world.setBarracksLevel(s.players.map(p => p.barracks));
     world.night.target = nightParam ?? nightLevel(s?.wave ?? 0);
     world.setPlacementZone(s?.phase === 'prep');
     fx.update(dt);
@@ -69,7 +72,7 @@ async function enter(c: Connection) {
   fx.onBanner = t => ui.fortressBanner(t, world.map);
   const [outer, inner] = world.map.barriers;
   world.target.set((outer.x + inner.x) / 2 - 6, 0, world.map.depth / 2); world.yaw = 0; world.dist = 100; world.pitch = 0.95;
-  minimap = new Minimap(world, document.getElementById('ui')!);
+  minimap = new Minimap(world, document.getElementById('rightcol') ?? document.getElementById('ui')!);
   wire(c, true);
 }
 
