@@ -50,3 +50,12 @@ describe('data tables', () => {
     }
   });
 });
+
+import { waveAt, WAVES as W2 } from './waves';
+describe('endless waves', () => {
+  it('keeps going and grows past the campaign', () => {
+    const n = (i: number) => waveAt(i).groups.reduce((a, g) => a + g.count, 0);
+    expect(waveAt(W2.length + 10).groups.length).toBeGreaterThan(0);
+    expect(n(W2.length + 20)).toBeGreaterThan(n(W2.length));
+  });
+});

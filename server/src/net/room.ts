@@ -18,8 +18,8 @@ export class Room {
   private timer?: ReturnType<typeof setInterval>;
   private everFull = false;
 
-  constructor(public code: string, seed = (Math.random() * 2 ** 32) >>> 0, mapId = DEFAULT_MAP) {
-    this.state = createGame(Object.hasOwn(MAPS, mapId) ? mapId : DEFAULT_MAP, seed);
+  constructor(public code: string, seed = (Math.random() * 2 ** 32) >>> 0, mapId = DEFAULT_MAP, endless = false) {
+    this.state = createGame(Object.hasOwn(MAPS, mapId) ? mapId : DEFAULT_MAP, seed, endless);
     this.tokens = [token(), token()];
   }
 
@@ -94,7 +94,7 @@ export class Room {
   snapshot(): Snapshot {
     const s = this.state;
     const snap: Snapshot = {
-      tick: s.tick, time: s.time, phase: s.phase, timer: s.timer, wave: s.wave, waveCount: WAVES.length,
+      tick: s.tick, time: s.time, phase: s.phase, timer: s.timer, wave: s.wave, waveCount: s.endless ? 0 : WAVES.length, endless: s.endless,
       players: s.players,
       units: s.units.map(u => ({
         id: u.id, type: u.type, side: u.side, owner: u.owner, x: +u.x.toFixed(2), y: +u.y.toFixed(2),
@@ -126,13 +126,13 @@ export class RoomRegistry {
   readonly createdAt = new WeakMap<Room, number>();
 
   /** null when the server is full */
-  create(mapId?: string): Room | null {
+  create(mapId?: string, endless = false): Room | null {
     this.sweep();
     if (this.rooms.size >= MAX_ROOMS) return null;
     let code: string;
     do { code = Array.from({ length: 4 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join(''); }
     while (this.rooms.has(code));
-    const room = new Room(code, undefined, mapId);
+    const room = new Room(code, undefined, mapId, endless);
     room.start();
     this.rooms.set(code, room);
     this.createdAt.set(room, Date.now());

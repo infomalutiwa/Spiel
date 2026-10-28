@@ -174,6 +174,8 @@ export interface SquadInfo { id: number; troop: TroopType; owner: PlayerId; x: n
 
 export interface GameState {
   mapId: string;
+  /** endless mode: the waves never run out */
+  endless: boolean;
   tick: number;
   time: number;
   rng: number;
@@ -257,7 +259,7 @@ export type Result = { ok: true } | { ok: false; reason: string };
 
 /* ---- network protocol ---- */
 export type ClientMsg =
-  | { t: 'create'; mapId?: string }
+  | { t: 'create'; mapId?: string; endless?: boolean }
   | { t: 'join'; code: string; token?: string }
   | { t: 'cmd'; cmd: Command }
   /** the tab went to / came back from the background; the game waits while either player is away */
@@ -273,7 +275,7 @@ export interface UnitSnap {
 }
 export interface ZoneSnap { p: number; o: 0 | 1; /** seconds of siege pause left */ h: number }
 export interface Snapshot {
-  tick: number; time: number; phase: Phase; timer: number; wave: number; waveCount: number;
+  tick: number; time: number; phase: Phase; timer: number; wave: number; waveCount: number; endless?: boolean;
   players: [PlayerState, PlayerState];
   /** decoded unit list (on the wire: base64 in `u`, see codec.ts) */
   units: UnitSnap[];

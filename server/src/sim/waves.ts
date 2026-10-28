@@ -1,5 +1,5 @@
 import {
-  COLUMN_OFFSET, ENEMIES, groupCount, MAPS, PREP_TIME, WAVES, gemReward, waveSpread, stoneReward, waveReward, type GameState, type Phase,
+  COLUMN_OFFSET, ENEMIES, groupCount, MAPS, PREP_TIME, WAVES, waveAt, gemReward, waveSpread, stoneReward, waveReward, type GameState, type Phase,
 } from '@burgwacht/shared';
 import { isFixedType } from '@burgwacht/shared';
 import { castleOf, pushEvent, rand, spawnUnit } from './state';
@@ -10,7 +10,7 @@ function setPhase(s: GameState, phase: Phase) {
 }
 
 function startBattle(s: GameState) {
-  const wave = WAVES[s.wave];
+  const wave = waveAt(s.wave);
   s.spawnQueue = [];
   s.shells = [];
   s.battleTime = 0;
@@ -33,7 +33,7 @@ function startBattle(s: GameState) {
 
 function endBattle(s: GameState) {
   const reward = waveReward(s.wave);
-  for (const p of s.players) { p.gold += reward; p.stone += stoneReward(s.wave); p.gems += gemReward(s.wave, WAVES.length); }
+  for (const p of s.players) { p.gold += reward; p.stone += stoneReward(s.wave); p.gems += gemReward(s.wave, s.endless ? 9999 : WAVES.length); }
   s.zones.forEach(z => { z.owner = 'player'; z.progress = 0; z.reached = false; z.hold = 0; });
   for (const u of s.units) { // a night's rest between waves; buildings mend a third of the damage on their own
     if (isFixedType(u.type)) { if (u.type !== 'castle') u.hp = Math.min(u.maxHp, u.hp + (u.maxHp - u.hp) * 0.35); continue; }
@@ -44,7 +44,7 @@ function endBattle(s: GameState) {
   const castle = castleOf(s);
   if (castle) castle.hp = Math.min(castle.maxHp, castle.hp + castle.maxHp * 0.2);
   s.wave++;
-  if (s.wave >= WAVES.length) return setPhase(s, 'won');
+  if (!s.endless && s.wave >= WAVES.length) return setPhase(s, 'won');
   s.timer = PREP_TIME;
   setPhase(s, 'prep');
 }

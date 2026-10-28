@@ -96,7 +96,7 @@ wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
       let room: Room | undefined | null;
       if (msg.t === 'create') {
         if (!mayCreate(ip)) return err('too_many_rooms');
-        room = rooms.create(typeof msg.mapId === 'string' ? msg.mapId : undefined);
+        room = rooms.create(typeof msg.mapId === 'string' ? msg.mapId : undefined, msg.endless === true);
         if (!room) return err('server_full');
       } else if (msg.t === 'join') {
         room = typeof msg.code === 'string' ? rooms.get(msg.code) : undefined;

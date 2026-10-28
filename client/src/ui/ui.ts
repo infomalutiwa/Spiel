@@ -1,6 +1,6 @@
 import {
   BARRACKS, MAX_BARRACKS, MAX_TROOP_LEVEL, MAX_WALL_LEVEL, QUEUE_MAX, REBUILD_COST, REPAIR_COST, SLOT_WEIGHT, SQUAD_SIZE, STONE_LOT, STONE_PER_SHOT,
-  TECH, TECH_COST, TROOP_ORDER, groupCount, TROOPS, UNIT_DEFS, UPGRADE_COST, WAVES, armyCap, canManWalls, gemReward, squadCost, stoneLotCost, stoneReward,
+  TECH, TECH_COST, TROOP_ORDER, groupCount, TROOPS, UNIT_DEFS, UPGRADE_COST, WAVES, waveAt, armyCap, canManWalls, gemReward, squadCost, stoneLotCost, stoneReward,
   unitPrice, waveReward,
   type AbilityId, type Formation, type MapDef, type PlayerId, type Snapshot, type TroopType,
 } from '@burgwacht/shared';
@@ -32,7 +32,7 @@ const FORM: Record<Formation, string> = { line: 'Linie', wedge: 'Keil', block: '
 const $ = <T extends HTMLElement>(sel: string, root: ParentNode = document) => root.querySelector(sel) as T;
 const el = (html: string) => { const t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstElementChild as HTMLElement; };
 
-export interface LobbyHandlers { create(mapId: string): Promise<void>; join(code: string): Promise<void>; preview(mapId: string): void }
+export interface LobbyHandlers { create(mapId: string, endless: boolean): Promise<void>; join(code: string): Promise<void>; preview(mapId: string): void }
 
 const SWATCH: Record<string, string> = {
   meadow: 'linear-gradient(135deg,#9fd078,#7db860 55%,#e0bd8b)', forest: 'linear-gradient(135deg,#5f9e50,#3f7d3f 55%,#c9ad84)', valley: 'linear-gradient(135deg,#d9bb68,#a8c862 55%,#e1c18e)',
@@ -63,6 +63,7 @@ export class Ui {
       <div id="lobby"><div class="panel lobbycard">
         <h1 class="title">Burgwacht</h1>
         <p class="subtitle">Verteidigt gemeinsam eure Burg – Seite an Seite.</p>
+        <div class="seg" id="modes"><button class="on" data-mode="campaign">Kampagne (25 Wellen)</button><button data-mode="endless">Endlos</button></div>
         <div class="maps" id="maps">${Object.values(MAPS).map((m, i) => `<button class="mapcard${i === 0 ? ' on' : ''}" data-map="${m.id}"><div class="sw" style="background:${SWATCH[m.id]}"></div><b>${m.name}</b><span>${m.blurb}</span></button>`).join('')}</div>
         <div class="row"><button class="btn green" id="create">Neues Spiel starten</button></div>
         <p class="hint" style="margin:18px 0 8px">oder einem Raum beitreten</p>
@@ -78,14 +79,20 @@ export class Ui {
       btn.disabled = true; err.textContent = '';
       p.catch(e => { err.textContent = reasonText(String(e.message ?? e)); btn.disabled = false; });
     };
-    let mapId = Object.keys(MAPS)[0];
+    let mapId = Object.keys(MAPS)[0], endless = false;
+    const modes = $('#modes', this.lobby);
+    modes.onclick = ev => {
+      const b = (ev.target as HTMLElement).closest<HTMLElement>('button'); if (!b) return;
+      endless = b.dataset.mode === 'endless';
+      modes.querySelectorAll('button').forEach(c => c.classList.toggle('on', c === b));
+    };
     $('#maps', this.lobby).onclick = ev => {
       const b = (ev.target as HTMLElement).closest<HTMLElement>('.mapcard'); if (!b) return;
       mapId = b.dataset.map!;
       this.lobby!.querySelectorAll('.mapcard').forEach(c => c.classList.toggle('on', c === b));
       h.preview(mapId);
     };
-    $<HTMLButtonElement>('#create', this.lobby).onclick = ev => wrap(h.create(mapId), ev.currentTarget as HTMLButtonElement);
+    $<HTMLButtonElement>('#create', this.lobby).onclick = ev => wrap(h.create(mapId, endless), ev.currentTarget as HTMLButtonElement);
     $<HTMLButtonElement>('#join', this.lobby).onclick = ev => wrap(h.join(code.value.trim()), ev.currentTarget as HTMLButtonElement);
     mountInstall($('.lobbycard', this.lobby));
     code.onkeydown = ev => { if (ev.key === 'Enter') $<HTMLButtonElement>('#join', this.lobby!).click(); };
@@ -439,8 +446,8 @@ export class Ui {
     if (!this.hud) return;
     this.snap = s;
     const you = conn.you;
-    const waveName = WAVES[Math.min(s.wave, WAVES.length - 1)].name;
-    $('#waveTxt', this.hud).textContent = `Welle ${Math.min(s.wave + 1, s.waveCount)} / ${s.waveCount}`;
+    const waveName = waveAt(s.wave).name;
+    $('#waveTxt', this.hud).textContent = s.waveCount ? `Welle ${Math.min(s.wave + 1, s.waveCount)} / ${s.waveCount}` : `Welle ${s.wave + 1} · Endlos`;
     const timer = $('#timer', this.hud), sub = $('#phaseSub', this.hud);
     if (s.phase === 'prep') { timer.textContent = `${Math.max(0, Math.ceil(s.timer))}s`; sub.textContent = 'Aufstellphase'; }
     else if (s.phase === 'battle') { timer.textContent = ''; sub.textContent = `Kampf: ${waveName}`; }
@@ -448,7 +455,7 @@ export class Ui {
 
     const map = MAPS[conn.mapId] ?? MAPS.meadow;
     $('#preview', this.hud).textContent = s.phase === 'prep'
-      ? 'Als Nächstes: ' + WAVES[Math.min(s.wave, WAVES.length - 1)].groups
+      ? 'Als Nächstes: ' + waveAt(s.wave).groups
         .map(g => `${groupCount(map.waveScale, s.wave, g)}× ${UNIT_DEFS[g.type].name}`).join(', ')
       : '';
 
@@ -498,7 +505,7 @@ export class Ui {
     // phase / wave announcements
     if (s.phase !== this.lastPhase || s.wave !== this.lastWave) {
       if (s.phase === 'battle') this.banner(`Welle ${s.wave + 1}`, waveName);
-      else if (s.phase === 'prep' && this.lastPhase !== '') this.banner('Geschafft!', `+${waveReward(s.wave - 1)} Gold · +${stoneReward(s.wave - 1)} Stein · +${gemReward(s.wave - 1, s.waveCount)} 💎 – repariert, füllt auf, baut aus`);
+      else if (s.phase === 'prep' && this.lastPhase !== '') this.banner('Geschafft!', `+${waveReward(s.wave - 1)} Gold · +${stoneReward(s.wave - 1)} Stein · +${gemReward(s.wave - 1, s.waveCount || 9999)} 💎 – repariert, füllt auf, baut aus`);
       else if (s.phase === 'prep') this.banner('Aufstellphase', 'Bogenschützen auf die Mauerkrone, Ritter ans Tor, Katapulte dahinter');
       if (s.phase === 'won') this.endScreen(true);
       if (s.phase === 'lost') this.endScreen(false);

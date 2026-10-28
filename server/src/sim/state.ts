@@ -21,11 +21,11 @@ const newPlayer = (): PlayerState => ({
   ready: false, abilityCd: { arrowRain: 0, rally: 0 }, queue: [],
 });
 
-export function createGame(mapId: string, seed: number): GameState {
+export function createGame(mapId: string, seed: number, endless = false): GameState {
   const map = MAPS[mapId];
   if (!map) throw new Error(`unknown map ${mapId}`);
   const s: GameState = {
-    mapId, tick: 0, time: 0, rng: seed >>> 0, nextId: 1, phase: 'prep', timer: PREP_TIME,
+    mapId, endless, tick: 0, time: 0, rng: seed >>> 0, nextId: 1, phase: 'prep', timer: PREP_TIME,
     wave: 0, players: [newPlayer(), newPlayer()], units: [], spawnQueue: [], shells: [], battleTime: 0, lastSpawn: 0, events: [],
     zones: map.zones.map(() => ({ owner: 'player' as const, progress: 0, reached: false, hold: 0 })), squads: [],
   };

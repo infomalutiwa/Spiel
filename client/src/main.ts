@@ -116,7 +116,7 @@ const preset = params.get('room')?.toUpperCase() ?? undefined;
 const gallery = params.has('gallery');
 if (gallery) void showGallery(world); else ui.showLobby({
   preview: id => world.setMap(MAPS[id]),
-  create: async mapId => enter(await Connection.open(undefined, mapId)),
+  create: async (mapId, endless) => enter(await Connection.open(undefined, mapId, endless)),
   join: async code => {
     if (code.length !== 4) throw new Error('room_not_found');
     await enter(await Connection.open(code));

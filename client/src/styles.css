@@ -368,3 +368,4 @@ button:focus-visible { outline: 3px solid #2b6fd6; outline-offset: 2px; }
 .orders#orders { overflow-x: auto; overflow-y: hidden; scrollbar-width: none; touch-action: pan-x; max-width: calc(var(--vw, 100vw) - 130px); }
 .orders#orders::-webkit-scrollbar { display: none; }
 .orders#orders > * { flex: none; }
+.seg button.on { background: #fff8e8; box-shadow: 0 1px 3px rgba(60,40,20,.25); }

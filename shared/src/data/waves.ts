@@ -64,6 +64,14 @@ export const WAVES: WaveDef[] = [
     g('raider_catapult', 7, 1), g('shaman', 8, 1), g('raider_archer', 18, 0)] },
 ];
 
+/** endless mode: after the last campaign wave the final waves repeat, ever bigger, and every 5th wave brings the boss column */
+export function waveAt(i: number): WaveDef {
+  if (i < WAVES.length) return WAVES[i];
+  const over = i - WAVES.length + 1, base = WAVES[WAVES.length - 1 - (over % 5 === 0 ? 0 : 1 + (over % 4))];
+  const k = 1 + 0.18 * over;
+  return { name: `Endlos ${i + 1}: ${base.name}`, groups: base.groups.map(g => ({ ...g, count: g.type === 'warlord' ? g.count + Math.floor(over / 3) : Math.ceil(g.count * k) })) };
+}
+
 /** how many of a group actually come: the map's scale and the wave number stretch ordinary groups, bosses stay as written */
 export const groupCount = (mapScale: number, wave: number, g: WaveGroup) =>
   g.type === 'warlord' ? g.count : Math.max(1, Math.round(g.count * mapScale * (0.8 + 0.045 * wave)));

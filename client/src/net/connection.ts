@@ -24,7 +24,7 @@ export class Connection {
   }
 
   /** open a socket and either create a room (no code) or join one */
-  static open(code?: string, mapId?: string): Promise<Connection> {
+  static open(code?: string, mapId?: string, endless = false): Promise<Connection> {
     return new Promise((resolve, reject) => {
       const c = new Connection();
       c.ws = new WebSocket(Connection.url());
@@ -32,7 +32,7 @@ export class Connection {
       c.ws.onopen = () => {
         let saved: string | undefined;
         try { saved = code ? sessionStorage.getItem(`bw-token-${code.toUpperCase()}`) ?? undefined : undefined; } catch { /* Safari with blocked site data throws: join without a saved seat */ }
-        c.send(code ? { t: 'join', code: code.toUpperCase(), token: saved } : { t: 'create', mapId });
+        c.send(code ? { t: 'join', code: code.toUpperCase(), token: saved } : { t: 'create', mapId, endless });
       };
       c.ws.onmessage = ev => {
         const m: ServerMsg = JSON.parse(ev.data);
