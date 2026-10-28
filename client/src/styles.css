@@ -286,3 +286,20 @@ canvas#c, #selbox { touch-action: none; }
   .dabil { padding-left: 6px; gap: 5px; border-left-width: 2px; }
   .abil { width: 52px; height: 52px; border-width: 3px; font-size: 8.5px; } .abil i { font-size: 18px; } .abil .cdt { font-size: 17px; }
 }
+
+/* --- Zugänglichkeit (Apple HIG: Trefferfläche ≥ 44 pt, Mindestschrift, reduzierte Bewegung) --- */
+.dtools button, #mute, #fs, .seg button, .cmd, .mini, .abil, .chip, .card { position: relative; }
+.dtools button::after, #mute::after, #fs::after, .seg button::after, .mini::after, .chip::after {
+  content: ''; position: absolute; left: 50%; top: 50%; width: max(100%, 44px); height: max(100%, 44px); transform: translate(-50%, -50%);
+}
+@media (max-height: 520px) {
+  .card .nm, .cmd, .abil, .seg button, .mini, .zone, .sub, .preview, .dsel .dsub, .chip .fill, .card .cnt { font-size: max(11px, 1em); }
+  .chip .n { font-size: 11px; }
+}
+button:focus-visible { outline: 3px solid #2b6fd6; outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+@media (prefers-contrast: more) {
+  .zone, .chip, .card, .cmd, .dsel, .wallp { border-color: #3b2a1a; }
+}

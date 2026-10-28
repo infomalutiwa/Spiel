@@ -11,6 +11,8 @@ import { Ui, reasonText } from './ui/ui';
 import { showGallery } from './gallery';
 import { audio } from './audio';
 import { standalone } from './pwa';
+import { initA11y } from './a11y';
+initA11y();
 
 const canvas = document.getElementById('c') as HTMLCanvasElement;
 const world = new World(canvas, MAPS[DEFAULT_MAP]);
