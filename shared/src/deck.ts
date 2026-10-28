@@ -6,9 +6,9 @@ import type { MapDef, TroopType, UnitType } from './types';
 /** how far from a wall's centre line a unit counts as standing on it */
 export const DECK_REACH = 3.2;
 /** ranged defenders on a wall shoot this much further and hit this much harder */
-export const DECK_RANGE = 1.3;
+export const DECK_RANGE = 1.2;
 export const DECK_DAMAGE = 1.1;
-export const DECK_COVER = 0.75;
+export const DECK_COVER = 0.8;
 /** how high the wall crown is above the ground (render only) */
 export const DECK_HEIGHT = 3.3;
 export const TOWER_HEIGHT = 6.4;

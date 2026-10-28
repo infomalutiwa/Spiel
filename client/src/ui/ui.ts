@@ -11,7 +11,7 @@ import { MAPS } from '@burgwacht/shared';
 import { mountInstall } from '../pwa';
 const REASONS: Record<string, string> = {
   not_enough_gold: 'Nicht genug Gold', not_enough_gems: 'Nicht genug Edelsteine 💎 – es gibt nur wenige pro Welle', need_branch: 'Wähle erst einen Zweig', outside_zone: 'Hier darfst du nicht aufstellen – nimm die helle Fläche oder die goldene Mauerkrone', army_full: 'Armee voll – baut die Kaserne aus für mehr Plätze', squad_full: 'Der Trupp ist schon vollzählig', max_level: 'Höchste Stufe erreicht',
-  not_prep: 'Gerade nicht möglich', queue_full: 'Die Kaserne hat schon genug Aufträge – gleich nochmal', not_battle: 'Nur im Kampf', cooldown: 'Fähigkeit lädt noch',
+  not_prep: 'Gerade nicht möglich', queue_full: 'Die Kaserne hat schon genug Aufträge – gleich nochmal', not_battle: 'Nur im Kampf', cooldown: 'Das lädt noch – gleich nochmal versuchen',
   bad_command: 'Das geht so nicht', room_full: 'Der Raum ist schon voll', room_not_found: 'Diesen Raum gibt es nicht',
   connection_failed: 'Keine Verbindung zum Server', too_many_rooms: 'Zu viele neue Spiele in kurzer Zeit – kurz warten', server_full: 'Der Server ist gerade voll – versucht es gleich nochmal', bad_message: 'Das hat nicht geklappt',
 };
@@ -19,7 +19,7 @@ export const reasonText = (r: string) => REASONS[r] ?? r;
 
 const INFO: Record<TroopType, { role: string; strong: string; weak: string }> = {
   knight: { role: 'Der Fels der Truppe: zieht mit Spott die Gegner auf sich (Nahkämpfer greifen lieber ihn an). Im Block −15 % Schaden.', strong: 'Fußvolk, Pfeile', weak: 'Magie, Armbrust' },
-  archer: { role: 'Reichweite 17, hält Abstand zu Nahkämpfern und schießt auf Schwache zuerst. Auf der Mauerkrone +30 % Reichweite und Deckung.', strong: 'Leichte Ziele, Magier, Heiler', weak: 'Schwere Rüstung, Reiter' },
+  archer: { role: 'Reichweite 17, hält Abstand zu Nahkämpfern und schießt auf Schwache zuerst. Auf der Mauerkrone +20 % Reichweite und Deckung.', strong: 'Leichte Ziele, Magier, Heiler', weak: 'Schwere Rüstung, Reiter' },
   spearman: { role: 'Hält er die Stellung, prallen Reiter fast wirkungslos ab. Sucht sich Reiter als Ziel.', strong: 'Reiter (doppelt)', weak: 'Schwere Rüstung' },
   cavalry: { role: 'Schwingt aus der Flanke aus und stürzt sich auf Bogenschützen und Magier: Sturmangriff aus dem Anlauf.', strong: 'Fernkämpfer, Leichte', weak: 'Speerwall, Eisenwachen' },
   crossbowman: { role: 'Durchschlägt Rüstung – der Konter gegen Eisenwachen. Stark auf der Mauer.', strong: 'Schwere Rüstung', weak: 'Belagerung, Nahkampf' },
@@ -153,7 +153,8 @@ export class Ui {
         const active = controls.mode.k === 'buy' && controls.mode.troop === t;
         controls.setMode(active ? { k: 'select' } : { k: 'buy', troop: t });
       };
-      c.onmouseenter = () => {
+      const canHover = matchMedia('(hover: hover)').matches; // iOS answers the first tap with a hover instead of a click when a hover handler changes the page
+      if (canHover) c.onmouseenter = () => {
         const inf = INFO[t];
         tip.innerHTML = `<b>${d.name}-Trupp ×${n}</b><div>${inf.role}</div><div class="st">
           <span>Leben</span><span>${d.hp}</span><span>Schaden</span><span>${d.damage || '–'}</span>
@@ -164,7 +165,7 @@ export class Ui {
         tip.style.left = `${Math.min(innerWidth - 270, Math.max(8, r.left + r.width / 2 - 125))}px`;
         tip.style.top = `${r.top - tip.offsetHeight - 12}px`;
       };
-      c.onmouseleave = () => { tip.style.display = 'none'; };
+      if (canHover) c.onmouseleave = () => { tip.style.display = 'none'; };
       shop.appendChild(c); this.cardEls.set(t, c);
     });
 
@@ -297,9 +298,9 @@ export class Ui {
   /** the barracks queue of the player: what is being trained and how long it takes */
   private renderQueue(s: Snapshot, you: PlayerId) {
     const q = s.players[you].queue ?? [], box = $('#queue', this.hud!);
-    const levy = s.zones.some(z => (z.h ?? 0) > 0);
+    const levy = s.zones.some(z => (z.h ?? 0) > 0), speed = BARRACKS[s.players[you].barracks - 1]?.speed ?? 1;
     box.style.display = q.length ? 'flex' : 'none';
-    box.innerHTML = q.length ? '🏰 ' + q.map((it, i) => `<span class="qi${i === 0 ? ' now' : ''}">${TROOPS[it.troop].name}${it.squad ? ' +' + it.count : ''} ${Math.ceil(i === 0 && levy ? it.t / 2.5 : it.t)}s</span>`).join('') + (levy ? '<span class="qi levy">Notaufgebot!</span>' : '') : '';
+    box.innerHTML = q.length ? '🏰 ' + q.map((it, i) => `<span class="qi${i === 0 ? ' now' : ''}">${TROOPS[it.troop].name}${it.squad ? ' +' + it.count : ''} ${Math.ceil(i === 0 ? it.t / (speed * (levy ? 2.5 : 1)) : it.t / speed)}s</span>`).join('') + (levy ? '<span class="qi levy">Notaufgebot!</span>' : '') : '';
   }
 
   /** which bottom panels are visible for the current phase / tab */

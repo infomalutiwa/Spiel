@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   BARRACKS, MAX_ARMY, START_GOLD, START_STONE, STONE_LOT, STONE_PER_SHOT, STONE_PRICE, TECH, TECH_COST, UNIT_DEFS, WAVES,
-  armyCap, gemReward, isBossWave, stoneReward, waveReward,
+  MAPS, armyCap, gemReward, isBossWave, stoneReward, waveReward,
 } from '@burgwacht/shared';
 import { applyCommand, applyDamage, createGame, resolveDamage, tick } from './index';
 import { battle, foe, mine, run } from './helpers';
@@ -268,5 +268,21 @@ describe('barracks levels', () => {
     expect(used).toBeLessThanOrEqual(30);
     applyCommand(s, 0, { c: 'barracks' });
     expect(applyCommand(s, 0, { c: 'buy', troop: 'archer', x: z.x, y: 80 }).ok).toBe(true);
+  });
+});
+
+describe('repairs in battle', () => {
+  it('a wall piece can only be mended every 30 seconds while the battle runs (no endless stalemate at a gate)', () => {
+    const s = createGame('meadow', 1);
+    s.phase = 'battle'; s.spawnQueue = [{ at: 9999, type: 'footman', lane: 1 }];
+    s.players[0].gold = 9999;
+    const slot = MAPS.meadow.walls.findIndex(w => w.kind === 'gate' && w.bar === 0);
+    const gate = s.units.find(u => u.slot === slot)!;
+    gate.hp = gate.maxHp * 0.3;
+    expect(applyCommand(s, 0, { c: 'wall', op: 'repair', slot }).ok).toBe(true);
+    gate.hp = gate.maxHp * 0.3;
+    expect(applyCommand(s, 0, { c: 'wall', op: 'repair', slot })).toEqual({ ok: false, reason: 'cooldown' });
+    run(s, 31);
+    expect(applyCommand(s, 0, { c: 'wall', op: 'repair', slot }).ok).toBe(true);
   });
 });

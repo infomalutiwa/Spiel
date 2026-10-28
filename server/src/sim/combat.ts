@@ -117,6 +117,7 @@ export function ignite(victim: Unit, owner: PlayerId | null, dps: number, secs: 
 
 /** per-tick status effects: burning pulses twice a second and spreads to neighbours, slowness runs out */
 function stepStatus(s: GameState, u: Unit, dt: number): void {
+  if (u.t2 > 0 && isStructureType(u.type)) u.t2 = Math.max(0, u.t2 - dt); // repair cooldown of walls, gates and towers
   if (u.slow > 0) u.slow = Math.max(0, u.slow - dt);
   if (u.burn <= 0) return;
   const before = u.burn;
@@ -206,7 +207,7 @@ function attack(s: GameState, u: Unit, t: Unit): void {
   const credit: Credit = { owner: u.owner, unit: u };
   const charged = chargeReady(u);
   if (charged) pushEvent(s, { k: 'aoe', x: t.x, y: t.y, r: 3.2, kind: 'siege' }); // dust cloud of the charge
-  pushEvent(s, { k: 'shot', from: u.id, to: t.id, x: u.x, y: u.y, tx: t.x, ty: t.y, kind: def.damageKind });
+  pushEvent(s, { k: 'shot', from: u.id, to: t.id, x: u.x, y: u.y, tx: t.x, ty: t.y, kind: def.damageKind, ...(br === 'fire' ? { fire: true } : {}) });
   if (def.special === 'aoe' && def.areaRadius) { // mages: instant blast around the target
     pushEvent(s, { k: 'aoe', x: t.x, y: t.y, r: def.areaRadius, kind: br === 'frost' ? 'frost' : 'magic' });
     const victims: Unit[] = []; // collect first: applyDamage may touch the grid's neighbours

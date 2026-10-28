@@ -151,7 +151,7 @@ export interface PlayerState {
 export interface SpawnItem { at: number; type: EnemyType; lane: number }
 
 export type GameEvent =
-  | { k: 'shot'; from: number; to: number; x: number; y: number; tx: number; ty: number; kind: DamageKind }
+  | { k: 'shot'; from: number; to: number; x: number; y: number; tx: number; ty: number; kind: DamageKind; /** fire arrows */ fire?: boolean }
   | { k: 'dmg'; x: number; y: number; amt: number }
   | { k: 'heal'; x: number; y: number; amt: number }
   | { k: 'aoe'; x: number; y: number; r: number; kind: 'magic' | 'arrows' | 'rally' | 'siege' | 'frost' | 'fire' }

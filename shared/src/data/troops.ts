@@ -17,10 +17,10 @@ import type { TroopType, UnitDef } from '../types';
  *             and siege weapons count double – and leads moving targets. Each shot costs `stone` from the owner.
  *
  *            hp    dmg  kind      range  min  cd    speed  notes
- * knight     240   22   slash     1.6    –    1.0   3.2    armor 40 heavy, taunt 7
- * archer      62   14   pierce   17      6    1.1   3.6    longest regular range, wall crown +30 %
- * spearman   150   17   spear     2.4    –    1.0   3.4    ×1.9 vs mounted
- * cavalry    210   24   charge    1.8    –    1.2   7.2    charge ×2.2 after 14 units of run-up
+ * knight     260   28   slash     1.6    –    1.0   3.2    armor 40 heavy, taunt 7
+ * archer      62   14   pierce   17      6    1.1   3.6    longest regular range, wall crown +20 %
+ * spearman   165   21   spear     2.4    –    1.0   3.4    ×1.9 vs mounted
+ * cavalry    220   28   charge    1.8    –    1.2   7.2    charge ×2.2 after 14 units of run-up
  * crossbow    80   42   bolt     13      5    2.6   3.2    pierces 50 % armor
  * mage        75   32   magic    12      7    2.2   3.3    blast radius 3.8
  * healer      70   –    –         9      5    1.6   3.6    heals 2.2 × power to the most wounded ally in range
@@ -28,7 +28,7 @@ import type { TroopType, UnitDef } from '../types';
  */
 export const TROOPS: Record<TroopType, UnitDef> = {
   knight: {
-    name: 'Ritter', hp: 240, armor: 'heavy', armorValue: 40, damage: 22, damageKind: 'slash',
+    name: 'Ritter', hp: 260, armor: 'heavy', armorValue: 40, damage: 28, damageKind: 'slash',
     range: 1.6, speed: 3.2, cost: 100, morale: 100, cooldown: 1.0, radius: 0.9,
     role: 'tank', taunt: 7,
   },
@@ -38,12 +38,12 @@ export const TROOPS: Record<TroopType, UnitDef> = {
     role: 'archer', minRange: 6,
   },
   spearman: {
-    name: 'Speerträger', hp: 150, armor: 'light', armorValue: 22, damage: 17, damageKind: 'spear',
+    name: 'Speerträger', hp: 165, armor: 'light', armorValue: 26, damage: 21, damageKind: 'spear',
     range: 2.4, speed: 3.4, cost: 70, morale: 90, cooldown: 1.0, radius: 0.8,
     role: 'melee', prefers: ['mounted'],
   },
   cavalry: {
-    name: 'Reiter', hp: 210, armor: 'mounted', armorValue: 22, damage: 24, damageKind: 'charge',
+    name: 'Reiter', hp: 220, armor: 'mounted', armorValue: 22, damage: 28, damageKind: 'charge',
     range: 1.8, speed: 7.2, cost: 130, morale: 85, cooldown: 1.2, radius: 1.1,
     prefers: ['light'], // dives for archers, mages and healers
     role: 'cavalry',

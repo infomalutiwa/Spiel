@@ -7,7 +7,7 @@ export const ENEMIES: Record<EnemyType, UnitDef> = {
   },
   raider_archer: {
     name: 'Wegelagerer', hp: 55, armor: 'light', armorValue: 3, damage: 10, damageKind: 'pierce',
-    range: 14, speed: 3.3, cost: 12, morale: 60, cooldown: 1.3, radius: 0.7, role: 'archer', minRange: 5,
+    range: 16, speed: 3.3, cost: 12, morale: 60, cooldown: 1.3, radius: 0.7, role: 'archer', minRange: 5,
   },
   raider_rider: {
     name: 'Plünderer', hp: 140, armor: 'mounted', armorValue: 15, damage: 18, damageKind: 'charge',
@@ -21,7 +21,7 @@ export const ENEMIES: Record<EnemyType, UnitDef> = {
   },
   raider_catapult: {
     name: 'Wurfmaschine', hp: 130, armor: 'siege', armorValue: 10, damage: 70, damageKind: 'siege',
-    range: 24, speed: 1.6, cost: 30, morale: 100, cooldown: 5.0, radius: 1.5,
+    range: 27, speed: 1.6, cost: 30, morale: 100, cooldown: 5.0, radius: 1.5,
     prefers: ['structure'], special: 'aoe', areaRadius: 2.4, role: 'artillery', minRange: 8, shellSpeed: 15, edge: 0.4,
   },
   shaman: {

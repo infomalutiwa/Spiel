@@ -34,6 +34,7 @@ const SHARED = {
   boltMat: new THREE.MeshBasicMaterial({ color: '#ffe9a8' }),
   tipMat: new THREE.MeshBasicMaterial({ color: '#d7dde3' }),
   stoneMat: new THREE.MeshStandardMaterial({ color: '#8b8580', roughness: 1 }),
+  fireArrowMat: new THREE.MeshBasicMaterial({ color: '#ff7a1c' }),
   fireStoneMat: new THREE.MeshStandardMaterial({ color: '#4a2a18', emissive: '#ff6a1c', emissiveIntensity: 1.2, roughness: 1 }),
   orbMat: new THREE.SpriteMaterial({ map: glow, color: '#b78cff', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }),
 };
@@ -114,11 +115,12 @@ export class Effects {
     let m: THREE.Object3D, speed = 28, arc = Math.max(d * 0.12, overWall ? 4.5 : 0), spin = false, trail: THREE.ColorRepresentation | undefined;
     if (kind === 'pierce' || kind === 'bolt') {
       const g = new THREE.Group();
-      const shaft = new THREE.Mesh(kind === 'bolt' ? SHARED.boltShaft : SHARED.shaft, kind === 'bolt' ? SHARED.boltMat : SHARED.arrowMat);
+      const shaft = new THREE.Mesh(kind === 'bolt' ? SHARED.boltShaft : SHARED.shaft, ev.fire ? SHARED.fireArrowMat : kind === 'bolt' ? SHARED.boltMat : SHARED.arrowMat);
       shaft.rotation.x = Math.PI / 2;
-      const tip = new THREE.Mesh(SHARED.tip, SHARED.tipMat);
+      const tip = new THREE.Mesh(SHARED.tip, ev.fire ? SHARED.fireArrowMat : SHARED.tipMat);
       tip.rotation.x = Math.PI / 2; tip.position.z = 0.5;
       g.add(shaft, tip); m = g;
+      if (ev.fire) trail = '#ff9a3c';
       if (kind === 'bolt') { speed = 48; arc = Math.max(d * 0.02, overWall ? 2.2 : 0); }
     } else if (kind === 'magic') {
       m = new THREE.Sprite(SHARED.orbMat);

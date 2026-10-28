@@ -29,3 +29,6 @@ export const REPAIR_COST: Record<StructureType, number> = { wall: 140, gate: 220
 export const REBUILD_COST: Record<StructureType, number> = { wall: 260, gate: 420, tower: 480 };
 export const levelHpMul = (level: number) => 1 + 0.7 * (level - 1);
 export const levelArmorBonus = (level: number) => 12 * (level - 1);
+
+/** seconds before a wall piece can be repaired again during a battle (preparation: no limit) */
+export const REPAIR_COOLDOWN = 30;

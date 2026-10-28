@@ -22,14 +22,14 @@ canvas#c { position: fixed; left: 0; top: 0; width: var(--vw, 100%); height: var
 .coin { width: 20px; height: 20px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #ffe9a3, #f2b93b 70%); border: 2px solid #d89a1f; display: inline-block; }
 button { font-family: inherit; color: inherit; cursor: pointer; }
 .btn { border: 3px solid #fff; background: linear-gradient(#ffc27a, var(--orange2)); color: #fff; font-weight: 800; font-size: 20px; padding: 10px 26px; border-radius: 999px; box-shadow: 0 5px 0 #b86a24, 0 12px 20px rgba(120, 60, 20, .3); text-shadow: 0 2px 0 rgba(120, 60, 20, .45); transition: transform .08s, box-shadow .08s, filter .15s; }
-.btn:hover { filter: brightness(1.06); transform: translateY(-1px); }
+@media (hover: hover) { .btn:hover { filter: brightness(1.06); transform: translateY(-1px); } }
 .btn:active { transform: translateY(4px); box-shadow: 0 1px 0 #b86a24, 0 4px 8px rgba(120, 60, 20, .3); }
 .btn.green { background: linear-gradient(#9fe3a2, #58b564); box-shadow: 0 5px 0 #3b8a47, 0 12px 20px rgba(30, 90, 40, .3); text-shadow: 0 2px 0 rgba(30, 90, 40, .45); }
 .btn.ghost { background: var(--cream); color: var(--brown); text-shadow: none; box-shadow: 0 5px 0 rgba(90, 70, 50, .2), 0 12px 20px rgba(90, 60, 30, .18); }
 .btn[disabled] { filter: grayscale(.7) brightness(.95); cursor: not-allowed; opacity: .75; }
 
 /* lobby */
-#lobby { position: absolute; inset: 0; display: grid; place-items: center; background: radial-gradient(circle at 50% 40%, rgba(255, 240, 200, .25), rgba(255, 190, 120, .35)); backdrop-filter: blur(2px); }
+#lobby { position: absolute; inset: 0; display: grid; place-items: center; background: radial-gradient(circle at 50% 40%, rgba(255, 240, 200, .25), rgba(255, 190, 120, .35)); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
 .lobbycard { width: min(560px, 92vw); text-align: center; padding: 30px 34px 34px; }
 .title { font-weight: 800; font-size: clamp(48px, 9vw, 84px); line-height: .95; margin: 0; letter-spacing: .5px; color: #fff; -webkit-text-stroke: 0; text-shadow: 0 4px 0 #c97a35, 0 8px 0 #a85f23, 0 18px 30px rgba(120, 60, 20, .45); }
 .subtitle { font-size: 20px; margin: 10px 0 24px; color: var(--brown2); font-weight: 700; }
@@ -63,7 +63,7 @@ button { font-family: inherit; color: inherit; cursor: pointer; }
 .bottom > * { pointer-events: auto; }
 .shop { display: flex; gap: 8px; padding: 10px 12px; }
 .card { width: 98px; padding: 4px 4px 8px; border-radius: 18px; border: 3px solid transparent; background: #fffaf0; box-shadow: 0 4px 0 rgba(90, 70, 50, .15); text-align: center; transition: transform .1s, border-color .1s, background .1s; position: relative; }
-.card:hover { transform: translateY(-4px); border-color: var(--orange); }
+@media (hover: hover) { .card:hover { transform: translateY(-4px); border-color: var(--orange); } }
 .card.active { border-color: var(--orange2); background: #fff0cf; transform: translateY(-6px); }
 .card.poor { opacity: .55; filter: grayscale(.5); }
 .card img { width: 84px; height: 84px; display: block; margin: 0 auto -4px; pointer-events: none; }
@@ -78,7 +78,7 @@ button { font-family: inherit; color: inherit; cursor: pointer; }
 .orders { display: flex; gap: 8px; padding: 10px 12px; align-items: center; }
 .ob { position: relative; min-width: 76px; padding: 8px 10px 6px; border-radius: 16px; border: 3px solid transparent; background: #fffaf0; box-shadow: 0 4px 0 rgba(90, 70, 50, .15); font-weight: 800; font-size: 15px; text-align: center; line-height: 1.05; }
 .ob .ic { font-size: 24px; display: block; }
-.ob:hover { border-color: var(--orange); transform: translateY(-3px); }
+@media (hover: hover) { .ob:hover { border-color: var(--orange); transform: translateY(-3px); } }
 .ob.active { border-color: var(--orange2); background: #fff0cf; }
 .sep { width: 3px; align-self: stretch; background: rgba(90, 70, 50, .15); border-radius: 3px; margin: 0 4px; }
 .abil { position: relative; overflow: hidden; }
@@ -93,7 +93,7 @@ button { font-family: inherit; color: inherit; cursor: pointer; }
 .banner h2 { margin: 0; font-size: clamp(40px, 7vw, 74px); color: #fff; text-shadow: 0 4px 0 #c97a35, 0 8px 0 #a85f23, 0 18px 30px rgba(120, 60, 20, .45); }
 .banner p { margin: 4px 0 0; font-size: 24px; font-weight: 800; color: #fff; text-shadow: 0 2px 0 rgba(120, 60, 20, .8), 0 0 10px rgba(120, 60, 20, .6); }
 @keyframes banner { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.6); } 14% { opacity: 1; transform: translate(-50%, -50%) scale(1.06); } 22% { transform: translate(-50%, -50%) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -62%) scale(1); } }
-.overlay { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(255, 230, 190, .5); backdrop-filter: blur(3px); }
+.overlay { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(255, 230, 190, .5); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
 .overlay .panel { text-align: center; padding: 26px 38px; }
 .overlay h2 { margin: 0 0 6px; font-size: 44px; }
 .hintbar { position: absolute; bottom: calc(var(--bot-h, 140px) + 10px); left: 50%; transform: translateX(-50%); padding: 6px 16px; font-weight: 700; font-size: 15px; background: rgba(255, 246, 228, .92); border-radius: 999px; border: 3px solid #fff; pointer-events: none !important; }
@@ -107,14 +107,14 @@ button { font-family: inherit; color: inherit; cursor: pointer; }
 .minimap canvas { border-radius: 11px; cursor: crosshair; display: block; touch-action: none; }
 .maps { display: flex; gap: 10px; justify-content: center; margin: 4px 0 18px; flex-wrap: wrap; }
 .mapcard { width: 150px; padding: 10px 10px 12px; border-radius: 18px; border: 3px solid transparent; background: #fffaf0; box-shadow: 0 4px 0 rgba(90, 70, 50, .15); text-align: center; transition: transform .1s, border-color .1s; }
-.mapcard:hover { transform: translateY(-3px); border-color: var(--orange); }
+@media (hover: hover) { .mapcard:hover { transform: translateY(-3px); border-color: var(--orange); } }
 .mapcard.on { border-color: var(--orange2); background: #fff0cf; }
 .mapcard b { display: block; font-size: 18px; }
 .mapcard span { display: block; font-size: 12.5px; line-height: 1.15; color: var(--brown2); font-weight: 700; margin-top: 3px; }
 .mapcard .sw { height: 46px; border-radius: 12px; margin-bottom: 6px; }
 @media (max-width: 1100px) and (pointer: fine) { .minimap { display: none; } }
 
-#mute, #fs { position: fixed; right: max(10px, env(safe-area-inset-right)); top: 10px; z-index: 50; width: 38px; height: 38px; border-radius: 50%; border: 0; cursor: pointer; font-size: 18px; background: rgba(40,30,20,.55); color: #fff; backdrop-filter: blur(4px); }
+#mute, #fs { position: fixed; right: max(10px, env(safe-area-inset-right)); top: 10px; z-index: 50; width: 38px; height: 38px; border-radius: 50%; border: 0; cursor: pointer; font-size: 18px; background: rgba(40,30,20,.55); color: #fff; -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
 
 #fs { top: 54px; }
 
@@ -135,7 +135,6 @@ canvas#c, #selbox { touch-action: none; }
   .ob.touchonly { display: block; }
   .key, .tip { display: none !important; }
   .card, .ob, .btn, .mapcard { touch-action: manipulation; }
-  .card:hover, .ob:hover, .mapcard:hover, .cmd:hover, .abil:hover, .btn:hover { transform: none; }
 }
 .topbar { left: max(14px, env(safe-area-inset-left)); right: calc(max(14px, env(safe-area-inset-right)) + 46px); } /* leaves room for the sound / fullscreen buttons */
 .bottom { padding-left: max(14px, env(safe-area-inset-left)); padding-right: max(14px, env(safe-area-inset-right)); bottom: max(12px, env(safe-area-inset-bottom)); }
@@ -250,7 +249,7 @@ canvas#c, #selbox { touch-action: none; }
 .cmd i { display: block; font-style: normal; font-size: 26px; line-height: 1.15; }
 .cmd span { display: block; }
 .cmd kbd, .abil kbd { position: absolute; top: 3px; right: 5px; font: 800 10px var(--font); background: var(--brown); color: #fff; border-radius: 6px; padding: 0 4px; opacity: .75; }
-.cmd:hover { border-color: var(--orange); transform: translateY(-2px); }
+@media (hover: hover) { .cmd:hover { border-color: var(--orange); transform: translateY(-2px); } }
 .cmd:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(90, 70, 50, .16); }
 .cmd.active { border-color: var(--orange2); background: #ffe9bd; }
 .dform { flex-direction: column; align-items: stretch; gap: 2px; justify-content: center; }
@@ -267,7 +266,7 @@ canvas#c, #selbox { touch-action: none; }
 .abil i { font-style: normal; font-size: 26px; line-height: 1; }
 .abil span { line-height: 1.05; margin-top: 1px; }
 .abil kbd { top: 5px; right: 12px; }
-.abil:hover { transform: translateY(-2px) scale(1.04); }
+@media (hover: hover) { .abil:hover { transform: translateY(-2px) scale(1.04); } }
 .abil.active { outline: 4px solid var(--orange2); outline-offset: 1px; }
 .abil.cool { filter: grayscale(.55) brightness(.92); }
 .abil.cool::after { content: ''; position: absolute; inset: 0; background: conic-gradient(rgba(60, 40, 20, .5) var(--p, 0%), transparent 0); }

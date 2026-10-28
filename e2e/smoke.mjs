@@ -36,18 +36,20 @@ check(await until(a, s => s && !s.paused), 'both players connected, game running
 const buy = (p, list) => p.evaluate(l => l.forEach(([t, x, y]) => window.__bw.conn.cmd({ c: 'buy', troop: t, x, y })), list);
 // troops come as squads: archers go onto the wall crown, knights stand behind the gate
 const gy = await a.evaluate(() => window.__bw.world.map.barriers[0].gateY), bx = await a.evaluate(() => window.__bw.world.map.barriers[0].x);
-await buy(a, [['archer', bx, gy - 18], ['knight', bx - 8, gy - 4]]);
+await buy(a, [['archer', bx, gy - 18], ['knight', bx - 8, gy - 4], ['catapult', bx - 18, gy - 12]]);
 await buy(b, [['crossbowman', bx, gy + 18], ['healer', bx - 16, gy + 8]]);
-check(await until(a, s => s.units.filter(u => u.owner !== null && u.squad > 0).length === 10 + 6 + 6 + 3), 'four squads bought and placed');
+check(await until(a, s => s.units.filter(u => u.owner !== null && u.squad > 0).length === 10 + 6 + 1 + 6 + 3), 'five squads bought and placed');
 check(await until(a, s => s.units.filter(u => u.type === 'archer').every(u => Math.abs(u.x - bx) < 0.01)), 'archers stand on the wall line');
 await a.waitForSelector('.chip');
-check((await a.$$('.chip')).length === 2, 'squad chips show up');
+check((await a.$$('.chip')).length === 3, 'squad chips show up');
 
 // third client is turned away
 const c = await open(); await c.goto(`${BASE}/?room=${code}`); await jsClick(c, '#join');
 await c.waitForSelector('.err:not(:empty)');
 check((await c.textContent('.err')).includes('voll'), 'third player is rejected with a clear message');
 
+// remember the stones that fly
+await a.evaluate(() => { window.__lobs = []; const c = window.__bw.conn, f = c.onSnapshot; c.onSnapshot = s => { for (const e of s.events) if (e.k === 'lob') window.__lobs.push(e); f(s); }; });
 await a.keyboard.press('Space'); await b.keyboard.press('Space');
 check(await until(a, s => s.phase === 'battle'), 'battle starts when both are ready');
 check(await until(a, s => s.units.some(u => u.side === 'enemy')), 'enemy wave spawns');
@@ -65,5 +67,7 @@ await jsClick(b, '#join');
 check(await until(a, s => !s.paused, 90000), 'rejoin by code resumes the game');
 
 check(await until(a, s => s.units.some(u => u.side === 'enemy' && u.hp < u.maxHp), 150000), 'fighting happens (enemies take damage)');
+check(await until(a, s => s.players[0].stone < 12 || s.phase === 'prep', 120000), 'the catapult uses up stone');
+check((await a.evaluate(() => window.__lobs.length)) > 0, 'a shell was lobbed (arc projectile event)');
 check(errors.length === 0, `no console errors${errors.length ? ': ' + errors.slice(0, 3).join(' | ') : ''}`);
 await browser.close();

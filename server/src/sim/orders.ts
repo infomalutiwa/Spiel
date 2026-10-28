@@ -1,5 +1,5 @@
 import {
-  BARRACKS, MAPS, MAX_BARRACKS, MAX_TROOP_LEVEL, QUEUE_MAX, STONE_LOT, STONE_PRICE, TECH_COST, armyCap, MAX_WALL_LEVEL, REBUILD_COST, REPAIR_COST, SLOT_WEIGHT, SQUAD_SIZE, TROOPS, UNIT_DEFS, UPGRADE_COST,
+  BARRACKS, MAPS, REPAIR_COOLDOWN, MAX_BARRACKS, MAX_TROOP_LEVEL, QUEUE_MAX, STONE_LOT, STONE_PRICE, TECH_COST, armyCap, MAX_WALL_LEVEL, REBUILD_COST, REPAIR_COST, SLOT_WEIGHT, SQUAD_SIZE, TROOPS, UNIT_DEFS, UPGRADE_COST,
   canManWalls, isFixedType, levelHpMul, squadCost, squadSlots, unitPrice, wallLineAt,
   type Command, type Formation, type GameState, type PlayerId, type Result, type TroopType, type Unit, type Vec2,
 } from '@burgwacht/shared';
@@ -205,9 +205,11 @@ export function applyCommand(s: GameState, player: PlayerId, c: Command): Result
         return { ok: true };
       }
       if (st.hp >= st.maxHp - 0.5) return fail('bad_command');
+      if (battle && st.t2 > 0) return fail('cooldown'); // in battle a piece can only be mended every REPAIR_COOLDOWN seconds: no endless stalemates at a gate
       const cost = Math.max(20, Math.round((REPAIR_COST[kind] * (1 - st.hp / st.maxHp)) / 5) * 5);
       if (cost > me.gold) return fail('not_enough_gold');
       me.gold -= cost; st.hp = st.maxHp;
+      st.t2 = battle ? REPAIR_COOLDOWN : 0;
       return { ok: true };
     }
 

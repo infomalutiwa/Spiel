@@ -30,7 +30,8 @@ export class Connection {
       c.ws = new WebSocket(Connection.url());
       let settled = false;
       c.ws.onopen = () => {
-        const saved = code ? sessionStorage.getItem(`bw-token-${code.toUpperCase()}`) ?? undefined : undefined;
+        let saved: string | undefined;
+        try { saved = code ? sessionStorage.getItem(`bw-token-${code.toUpperCase()}`) ?? undefined : undefined; } catch { /* Safari with blocked site data throws: join without a saved seat */ }
         c.send(code ? { t: 'join', code: code.toUpperCase(), token: saved } : { t: 'create', mapId });
       };
       c.ws.onmessage = ev => {
