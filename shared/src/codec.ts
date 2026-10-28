@@ -1,11 +1,11 @@
 import type { Snapshot, UnitSnap, UnitType, WireSnapshot } from './types';
 import { TROOP_ORDER } from './data/index';
 import { ENEMIES } from './data/enemies';
-import { STRUCTURE_TYPES } from './data/structures';
+import { BUILDING_TYPES, STRUCTURE_TYPES } from './data/structures';
 
 /** stable index <-> type table for the compact wire format */
 export const UNIT_TYPE_LIST: UnitType[] = [
-  ...TROOP_ORDER, ...(Object.keys(ENEMIES) as UnitType[]), 'castle', ...STRUCTURE_TYPES,
+  ...TROOP_ORDER, ...(Object.keys(ENEMIES) as UnitType[]), 'castle', ...STRUCTURE_TYPES, ...BUILDING_TYPES,
 ];
 const TYPE_INDEX = new Map(UNIT_TYPE_LIST.map((t, i) => [t, i]));
 const REC = 18;

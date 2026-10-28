@@ -1,7 +1,7 @@
 import { audio } from '../audio';
 import * as THREE from 'three';
 import {
-  SQUAD_SIZE, UNIT_DEFS, canManWalls, wallLineAt, type AbilityId, type Command, type Formation, type Snapshot, type TroopType, type UnitSnap,
+  SQUAD_SIZE, UNIT_DEFS, canManWalls, isBuildingType, wallLineAt, type AbilityId, type BuildingType, type Command, type Formation, type Snapshot, type TroopType, type UnitSnap,
 } from '@burgwacht/shared';
 import type { Connection } from '../net/connection';
 import type { World } from '../render/scene';
@@ -13,6 +13,7 @@ import type { FortressViews } from '../render/fortress';
 export type Mode =
   | { k: 'select' }
   | { k: 'buy'; troop: TroopType }
+  | { k: 'build'; kind: BuildingType }
   | { k: 'attackMove' }
   | { k: 'ability'; id: AbilityId };
 
@@ -32,6 +33,8 @@ export class Controls {
   selected = new Set<number>();
   /** wall / gate / tower slot whose panel is open, or -1 */
   wallSel = -1;
+  /** id of the own building whose panel is open, or -1 */
+  buildingSel = -1;
   fortress?: FortressViews;
   mode: Mode = { k: 'select' };
   formation: Formation = 'block';
@@ -174,12 +177,15 @@ export class Controls {
       this.send({ c: 'buy', troop: m.troop, x: g.x, y: g.y }); audio.play('coins', 0.7);
       return;
     }
+    if (m.k === 'build') { this.send({ c: 'build', kind: m.kind, x: g.x, y: g.y }); audio.play('coins', 0.7); this.cancel(); return; }
     if (m.k === 'ability') { this.send({ c: 'ability', id: m.id, x: g.x, y: g.y }); this.cancel(); return; }
     if (m.k === 'attackMove') {
       if (this.selected.size) this.send({ c: 'attack', ids: this.ids(), x: g.x, y: g.y, formation: this.formation });
       this.cancel(); return;
     }
+    this.buildingSel = -1;
     const u = this.pick(g, true);
+    if (u && isBuildingType(u.type)) { this.buildingSel = u.id; this.wallSel = -1; this.selected.clear(); this.onChange(); return; }
     if (u) {
       this.wallSel = -1;
       const dbl = performance.now() - this.lastClick.t < 350 && this.lastClick.id === u.id;
@@ -402,7 +408,11 @@ export class Controls {
     } else {
       if (this.ghost) this.ghost.visible = false;
       this.crownGhost.visible = false;
-      if (mode.k === 'ability' && g) {
+      if (mode.k === 'build' && g) {
+        const zn = this.world.map.placeZone, ok = g.x >= zn.x0 && g.x <= zn.x1 && g.y >= zn.y0 && g.y <= zn.y1;
+        this.ringGhost.visible = true; this.ringGhost.position.set(g.x, 0.15, g.y); this.ringGhost.scale.setScalar(3.4);
+        (this.ringGhost.material as THREE.MeshBasicMaterial).color.set(ok ? '#fff3c4' : '#ff8d8d');
+      } else if (mode.k === 'ability' && g) {
         this.ringGhost.visible = true; this.ringGhost.position.set(g.x, 0.15, g.y);
         this.ringGhost.scale.setScalar(mode.id === 'arrowRain' ? 7 : 12);
         (this.ringGhost.material as THREE.MeshBasicMaterial).color.set(mode.id === 'arrowRain' ? '#ffe3a8' : '#ffd75e');

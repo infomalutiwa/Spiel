@@ -7,11 +7,11 @@ import {
 import type { Controls } from '../input/controls';
 import type { Connection } from '../net/connection';
 import { renderPortraits } from '../render/portraits';
-import { MAPS } from '@burgwacht/shared';
+import { BUILDINGS, BUILD_INFO, BUILDING_TYPES, MAPS, MAX_BUILDING_LEVEL, MINE_INCOME, type BuildingType } from '@burgwacht/shared';
 import { mountInstall } from '../pwa';
 const REASONS: Record<string, string> = {
   not_enough_gold: 'Nicht genug Gold', not_enough_gems: 'Nicht genug Edelsteine 💎 – es gibt nur wenige pro Welle', need_branch: 'Wähle erst einen Zweig', outside_zone: 'Hier darfst du nicht aufstellen – nimm die helle Fläche oder die goldene Mauerkrone', army_full: 'Armee voll – baut die Kaserne aus für mehr Plätze', squad_full: 'Der Trupp ist schon vollzählig', max_level: 'Höchste Stufe erreicht',
-  not_prep: 'Gerade nicht möglich', queue_full: 'Die Kaserne hat schon genug Aufträge – gleich nochmal', not_battle: 'Nur im Kampf', cooldown: 'Das lädt noch – gleich nochmal versuchen',
+  building_max: 'Davon steht schon die Höchstzahl', not_prep: 'Gerade nicht möglich', queue_full: 'Die Kaserne hat schon genug Aufträge – gleich nochmal', not_battle: 'Nur im Kampf', cooldown: 'Das lädt noch – gleich nochmal versuchen',
   bad_command: 'Das geht so nicht', room_full: 'Der Raum ist schon voll', room_not_found: 'Diesen Raum gibt es nicht',
   connection_failed: 'Keine Verbindung zum Server', too_many_rooms: 'Zu viele neue Spiele in kurzer Zeit – kurz warten', server_full: 'Der Server ist gerade voll – versucht es gleich nochmal', bad_message: 'Das hat nicht geklappt',
 };
@@ -240,13 +240,15 @@ export class Ui {
     };
     $('#wallp', this.hud).onclick = ev => {
       const b = (ev.target as HTMLElement).closest<HTMLElement>('[data-op]'); if (!b) return;
-      if (b.dataset.op === 'close') { controls.wallSel = -1; controls.onChange(); return; }
+      if (b.dataset.op === 'close') { controls.wallSel = -1; controls.buildingSel = -1; controls.onChange(); return; }
+      if (b.dataset.op === 'bup') { conn.cmd({ c: 'bupgrade', id: controls.buildingSel }); return; }
       conn.cmd({ c: 'wall', op: b.dataset.op as 'upgrade' | 'repair' | 'rebuild', slot: controls.wallSel });
     };
     $('#sheet', this.hud).onclick = ev => {
       const b = (ev.target as HTMLElement).closest<HTMLElement>('[data-sh]'); if (!b) return;
       const [what, troop, branch] = b.dataset.sh!.split(':');
       if (what === 'close') this.toggleSheet(false);
+      else if (what === 'build') { this.toggleSheet(false); controls.setMode({ k: 'build', kind: troop as BuildingType }); this.toast(`${BUILDINGS[troop as BuildingType].name}: tippe in den Hof, wo es stehen soll`); }
       else if (what === 'barracks') conn.cmd({ c: 'barracks' });
       else if (what === 'tech') conn.cmd({ c: 'tech', troop: troop as TroopType, branch: branch ? Number(branch) : undefined });
     };
@@ -266,7 +268,7 @@ export class Ui {
 
   /** the upgrade sheet: barracks level and, per troop type, level 2 (branch choice) and level 3 – paid with gold and gems */
   private renderSheet(me: Snapshot['players'][number]) {
-    const sig = JSON.stringify([me.gold > 99999 ? 0 : Math.floor(me.gold / 10), me.gems, me.barracks, me.tech]);
+    const sig = JSON.stringify([me.gold > 99999 ? 0 : Math.floor(me.gold / 10), me.gems, me.barracks, me.tech, this.snap?.units.filter(u => u.owner === this.conn?.you && u.type in BUILDINGS).map(u => u.type)]);
     if (sig === this.sheetSig) return;
     this.sheetSig = sig;
     const sh = $('#sheet', this.hud!);
@@ -287,7 +289,12 @@ export class Ui {
       <div class="trow"><div class="th"><b>🏰 Kaserne</b><span class="stars">Stufe ${me.barracks}/${MAX_BARRACKS}</span></div><div class="tacts">
         <div class="tbcur"><b>${BARRACKS[me.barracks - 1].cap} Plätze · Ausbildung ×${BARRACKS[me.barracks - 1].speed}</b></div>
         ${nextB ? `<button class="tb" data-sh="barracks" ${can(nextB) ? '' : 'disabled'}><b>Stufe ${me.barracks + 1}</b><span class="bl">${nextB.cap} Plätze · Ausbildung ×${nextB.speed}</span><span class="wc">${cost(nextB)}</span></button>` : '<div class="tbcur max"><b>Höchste Stufe</b></div>'}
-      </div></div>${rows}`;
+      </div></div>
+      <h3 class="bh">Bauen <span class="sub">tippe danach in den Hof</span></h3>
+      <div class="trow">${BUILDING_TYPES.map(k => {
+        const n = this.snap?.units.filter(u => u.owner === this.conn?.you && u.type === k).length ?? 0, i = BUILD_INFO[k];
+        return `<button class="tb" data-sh="build:${k}" ${me.gold >= i.gold && n < i.max ? '' : 'disabled'}><b>${BUILDINGS[k].name} <small>${n}/${i.max}</small></b><span class="bl">${i.blurb}</span><span class="wc"><span class="coin"></span>${i.gold}</span></button>`;
+      }).join('')}</div>${rows}`;
   }
 
   private updateUtilCards(me: Snapshot['players'][number]) {
@@ -361,6 +368,20 @@ export class Ui {
   private updateWallPanel() {
     if (!this.hud || !this.controls || !this.conn) return;
     const p = $('#wallp', this.hud), c = this.controls, slot = c.wallSel;
+    if (c.buildingSel >= 0 && this.snap) {
+      const b = this.snap.units.find(u => u.id === c.buildingSel && u.type in BUILDINGS);
+      if (!b) c.buildingSel = -1;
+      else {
+        const k = b.type as BuildingType, gold = this.snap.players[this.conn.you].gold, info = BUILD_INFO[k];
+        const up = b.level < MAX_BUILDING_LEVEL ? info.up[b.level - 1] : 0;
+        const extra = k === 'goldmine' ? `<div class="hint">+${MINE_INCOME[b.level - 1]} Gold pro Sekunde</div>` : `<div class="hint">${info.blurb}</div>`;
+        p.innerHTML = `<button class="x" data-op="close">✕</button><div class="wh"><b>${BUILDINGS[k].name}</b><span class="stars">${'★'.repeat(b.level)}${'☆'.repeat(MAX_BUILDING_LEVEL - b.level)}</span></div>
+          <div class="wbar"><i style="width:${Math.max(0, Math.min(100, (b.hp / b.maxHp) * 100))}%"></i><span>${Math.round(b.hp)} / ${Math.round(b.maxHp)}</span></div>${extra}
+          <div class="wbtns">${b.level < MAX_BUILDING_LEVEL ? `<button class="ob wb" data-op="bup" ${up <= gold ? '' : 'disabled'}><span class="ic">⬆️</span>Verbessern<span class="wc"><span class="coin"></span>${up}</span></button>` : '<span class="hint">Höchste Stufe</span>'}</div>`;
+        p.style.display = 'block';
+        return;
+      }
+    }
     const map = MAPS[this.conn.mapId] ?? MAPS.meadow, def = map.walls[slot];
     if (!def || !this.snap) { p.style.display = 'none'; return; }
     const st = c.fortress?.slotUnit(slot), gold = this.snap.players[this.conn.you].gold, prep = this.snap.phase === 'prep';
@@ -514,7 +535,7 @@ export class Ui {
     }
     this.updateSquads();
     this.updateDeck();
-    if (controls.wallSel >= 0) this.updateWallPanel();
+    if (controls.wallSel >= 0 || controls.buildingSel >= 0) this.updateWallPanel();
 
     if ((s.paused || !conn.peerConnected) && s.phase !== 'won' && s.phase !== 'lost' && !this.waiting && !this.overlay) {
       this.overlay = el(`<div class="overlay"><div class="panel"><h2>Pause</h2><p class="hint">Es geht weiter, sobald ihr beide wieder im Spiel seid<span class="dots"></span></p>

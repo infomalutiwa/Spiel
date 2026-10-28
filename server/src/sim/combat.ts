@@ -44,7 +44,7 @@ export function resolveDamage(attacker: Unit, target: Unit): number {
   if (br === 'sniper') pierce = Math.max(pierce, 0.85);
   const mult = DAMAGE_VS_ARMOR[a.damageKind][t.armor];
   const armor = (t.armorValue + (isStructureType(target.type) ? levelArmorBonus(target.level) : 0)) * (1 - pierce);
-  const lv = isTroop(attacker) ? levelDamage(attacker.level) : 1 + 0.12 * (attacker.level - 1);
+  const lv = isTroop(attacker) ? levelDamage(attacker.level) : 1 + (isStructureType(attacker.type) ? 0.45 : 0.12) * (attacker.level - 1);
   let raw = a.damage * mult * lv * (1 + attacker.buff);
   if (br === 'pierce') raw *= 1.1;
   if (br === 'berserk') raw *= (1.35 * deep) * (attacker.hp < attacker.maxHp * 0.5 ? 1.25 : 1);

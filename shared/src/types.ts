@@ -9,7 +9,9 @@ export type EnemyType =
   | 'footman' | 'raider_archer' | 'raider_rider' | 'ram'
   | 'raider_catapult' | 'shaman' | 'brute' | 'ironguard' | 'warlord';
 export type StructureType = 'wall' | 'gate' | 'tower';
-export type UnitType = TroopType | EnemyType | StructureType | 'castle';
+/** free-standing buildings the players put up in the courtyard */
+export type BuildingType = 'bowtower' | 'ballista' | 'goldmine' | 'infirmary';
+export type UnitType = TroopType | EnemyType | StructureType | BuildingType | 'castle';
 export type Special = 'heal' | 'aoe' | 'buff';
 /** what a unit is good at; the AI in combat.ts picks targets and positions by role (see data/troops.ts) */
 export type Role = 'tank' | 'melee' | 'skirmisher' | 'archer' | 'caster' | 'healer' | 'cavalry' | 'artillery' | 'support' | 'siege';
@@ -165,7 +167,7 @@ export type GameEvent =
   | { k: 'wave'; wave: number }
   | { k: 'phase'; phase: Phase }
   | { k: 'zone'; id: number; owner: 'player' | 'enemy' }
-  | { k: 'breach'; slot: number; type: StructureType };
+  | { k: 'breach'; slot: number; type: StructureType | BuildingType };
 
 /** `reached`: the enemy has taken this zone at some point this wave, so the next one opens up even if defenders win it back */
 export interface ZoneState { owner: 'player' | 'enemy'; progress: number; reached: boolean; /** seconds the attackers still pause here after the zone fell */ hold: number }
@@ -209,6 +211,10 @@ export type Command =
   | { c: 'tech'; troop: TroopType; branch?: number }
   /** upgrades the player's barracks */
   | { c: 'barracks' }
+  /** puts up a building at (x, y) in the courtyard (preparation or battle) */
+  | { c: 'build'; kind: BuildingType; x: number; y: number }
+  /** next level of a building (max 3) */
+  | { c: 'bupgrade'; id: number }
   | { c: 'wall'; op: 'upgrade' | 'repair' | 'rebuild'; slot: number }
   | { c: 'place'; ids: number[]; x: number; y: number }
   | { c: 'move'; ids: number[]; x: number; y: number; formation?: Formation }

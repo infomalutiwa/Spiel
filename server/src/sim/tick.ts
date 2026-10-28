@@ -8,6 +8,7 @@ import { TICK_DT } from './state';
 import { stepWaves } from './waves';
 import { rebuildGrid } from './grid';
 import { stepTraining } from './training';
+import { stepBuildings } from './buildings';
 import { stepDecks, stepRoutes, stepZones } from './fortress';
 
 export function tick(s: GameState, dt = TICK_DT): void {
@@ -15,7 +16,7 @@ export function tick(s: GameState, dt = TICK_DT): void {
   s.tick++;
   s.time += dt;
   stepWaves(s, dt);
-  if (s.phase === 'prep' || s.phase === 'battle') stepTraining(s, dt);
+  if (s.phase === 'prep' || s.phase === 'battle') { stepTraining(s, dt); stepBuildings(s, dt); }
   if (s.phase === 'battle') {
     rebuildGrid(s);
     stepDecks(s);

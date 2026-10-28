@@ -33,6 +33,7 @@ export function formationSlots(units: Unit[], f: Formation, center: Vec2, facing
   return out;
 }
 
+import { build, upgradeBuilding } from './buildings';
 const inZone = (s: GameState, x: number, y: number) => {
   const z = MAPS[s.mapId].placeZone;
   return x >= z.x0 && x <= z.x1 && y >= z.y0 && y <= z.y1;
@@ -179,6 +180,18 @@ export function applyCommand(s: GameState, player: PlayerId, c: Command): Result
       if (next.gems > me.gems) return fail('not_enough_gems');
       me.gold -= next.gold; me.gems -= next.gems; me.barracks++;
       return { ok: true };
+    }
+
+    case 'build': {
+      if (!prepOnly && !battle) return fail('not_prep');
+      const r = build(s, player, c.kind, c.x, c.y);
+      return r ? fail(r) : { ok: true };
+    }
+
+    case 'bupgrade': {
+      if (!prepOnly && !battle) return fail('not_prep');
+      const r = upgradeBuilding(s, player, c.id);
+      return r ? fail(r) : { ok: true };
     }
 
     case 'wall': {

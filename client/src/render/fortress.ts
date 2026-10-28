@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { MapDef, UnitSnap, WallDef, ZoneSnap } from '@burgwacht/shared';
-import { UNIT_DEFS, isStructureType } from '@burgwacht/shared';
+import { UNIT_DEFS, isWallType as isStructureType } from '@burgwacht/shared';
 import { loadModel } from './assets';
 import type { World } from './scene';
 

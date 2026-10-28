@@ -1,7 +1,7 @@
 import type { UnitDef, UnitType } from '../types';
 import { TROOPS } from './troops';
 import { ENEMIES, CASTLE_DEF } from './enemies';
-import { STRUCTURES } from './structures';
+import { BUILDINGS, STRUCTURES } from './structures';
 
 export * from './counters';
 export * from './troops';
@@ -13,5 +13,5 @@ export * from './squads';
 export * from './economy';
 export * from './upgrades';
 
-export const UNIT_DEFS: Record<UnitType, UnitDef> = { ...TROOPS, ...ENEMIES, ...STRUCTURES, castle: CASTLE_DEF };
+export const UNIT_DEFS: Record<UnitType, UnitDef> = { ...TROOPS, ...ENEMIES, ...STRUCTURES, ...BUILDINGS, castle: CASTLE_DEF };
 export const TROOP_ORDER = Object.keys(TROOPS) as (keyof typeof TROOPS)[];
