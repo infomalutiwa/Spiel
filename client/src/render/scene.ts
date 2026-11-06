@@ -1,3 +1,4 @@
+import { Post } from './post';
 import * as THREE from 'three';
 import { onViewport, viewportSize } from '../viewport';
 import type { MapDef, MapTheme } from '@burgwacht/shared';
@@ -80,6 +81,7 @@ export class World {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: !lowQ && !(phone && devicePixelRatio >= 2), powerPreference: 'high-performance' });
     this.renderer.setPixelRatio(lowQ ? 0.6 : Math.min(devicePixelRatio, phone ? 1.5 : 2));
     this.renderer.shadowMap.enabled = !lowQ;
+    this.phone = phone;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = this.look.exposure;
@@ -101,6 +103,7 @@ export class World {
     this.build();
     this.night = new NightCycle(this);
     this.night.rebuild(map);
+    if (!lowQ) this.post = new Post(this.renderer, this.scene, this.camera, phone);
     this.resize();
     addEventListener('resize', () => this.resize());
     onViewport(() => this.resize());
@@ -108,6 +111,8 @@ export class World {
 
   /** ?q=low: no shadows, no scenery – for slow devices and software-rendered test browsers */
   readonly lowQ: boolean = false;
+  private phone = false;
+  post?: Post;
 
   private build() {
     const map = this.map;
@@ -145,6 +150,7 @@ export class World {
   resize() {
     const vp = viewportSize(), w = vp.w || this.canvas.clientWidth || innerWidth, h = vp.h || this.canvas.clientHeight || innerHeight;
     this.renderer.setSize(w, h, false);
+    this.post?.setSize(w, h);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
   }
@@ -555,6 +561,7 @@ export class World {
     }
     p.needsUpdate = true;
     this.night.update(dt);
-    this.renderer.render(this.scene, this.camera);
+    this.post?.setGlow(1 + this.night.level * 1.6);
+    if (this.post) this.post.render(dt); else this.renderer.render(this.scene, this.camera);
   }
 }
