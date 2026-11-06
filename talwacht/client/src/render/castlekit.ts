@@ -8,7 +8,9 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 /** bumped when the Blender kit has loaded, so cached procedural walls get rebuilt */
 export let kitVersion = 0;
 const KIT_MODULES = new Map<string, THREE.BufferGeometry>();
-const MAT_ID: Record<string, number> = { stone: 0, stone_dark: 0, stone_top: 0, plinth: 0, stone3: 0, stone3_dark: 0, wood: 1, wood_dark: 1, plank: 1, iron: 3 };
+const MAT_ID: Record<string, number> = { stone: 0, stone_dark: 0, stone_top: 0, plinth: 0, stone3: 0, stone3_dark: 0, wood: 1, wood_dark: 1, plank: 1, iron: 3, roof: 2, roof_dark: 2, cloth: 3, gold: 3, glass: 3 };
+/** a Blender module by name (null until the kit has loaded) */
+export const kitModule = (name: string) => KIT_MODULES.get(name) ?? null;
 /** glTF meshes → one non-indexed geometry with colour = material colour × baked AO, plus the kit material id */
 function moduleGeometry(obj: THREE.Object3D): THREE.BufferGeometry {
   const parts: THREE.BufferGeometry[] = [];
@@ -234,6 +236,12 @@ export function wallGeometry(tier: number, mask: number, keepSide: number, damag
 
 /** gate cell: L1 timber gate, L2 stone arch with banded doors, L3 gatehouse with flanking turrets and portcullis */
 export function gateParts(tier: number, alongX: boolean): { frame: THREE.BufferGeometry; door: THREE.BufferGeometry; portcullis: THREE.BufferGeometry | null } {
+  const kf = KIT_MODULES.get(`gate${tier}`), kd = KIT_MODULES.get(`gate_door${tier}`);
+  if (kf && kd) {
+    const r = (g: THREE.BufferGeometry) => (alongX ? g.clone() : g.clone().rotateY(Math.PI / 2));
+    const kp = KIT_MODULES.get('gate_port3');
+    return { frame: r(kf), door: r(kd), portcullis: tier === 3 && kp ? r(kp) : null };
+  }
   seed = 4000 + tier;
   const top = WALL_TOP[tier - 1], parts: THREE.BufferGeometry[] = [];
   const rot = (g: THREE.BufferGeometry) => (alongX ? g : g.rotateY(Math.PI / 2));
@@ -291,6 +299,8 @@ export function pitchGeometry(tier: number, level: number) {
 
 /** tower body + top; ground at y = 0. Platform height = rampart walkway + 2.2 */
 export function towerGeometry(kind: StructId, level: number): THREE.BufferGeometry {
+  const k = KIT_MODULES.get(`${kind}${level}`);
+  if (k) return k;
   seed = 7000 + level * 31 + kind.length;
   const parts: THREE.BufferGeometry[] = [];
   if (kind === 'watchtower') {
@@ -348,6 +358,8 @@ export function towerPlatform(kind: StructId, level: number) {
 
 /** the keep: a square donjon with corner turrets; grows with its level */
 export function keepGeometry(level: number): THREE.BufferGeometry {
+  const k = KIT_MODULES.get(`keep${level}`);
+  if (k) return k;
   seed = 9000 + level;
   const parts: THREE.BufferGeometry[] = [];
   const H = 14 + level * 3, W = 11, body = KIT.stone, dark = KIT.stoneDark;

@@ -9,7 +9,7 @@ import { UnitViews } from './render/units';
 import { Effects } from './render/effects';
 import { castleLayout, unitLayout } from './gallery';
 import { loadWallKit } from './render/castlekit';
-void loadWallKit();
+const kitReady = loadWallKit();
 import { Connection, interpolation } from './net/connection';
 import { Controls } from './input/controls';
 import { Hud, reasonText } from './ui/hud';
@@ -37,6 +37,7 @@ export async function loadMap(id: string) {
   world.content.add(buildTerrainMesh(t));
   water = buildWater(t);
   if (water) world.content.add(water);
+  await kitReady; // bridges come from the Blender kit
   await buildScenery(t, world.content);
   return t;
 }

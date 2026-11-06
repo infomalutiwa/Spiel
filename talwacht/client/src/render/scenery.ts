@@ -3,6 +3,7 @@ import { fbm, K, polyDist, rng, type Terrain } from '@talwacht/shared';
 import { loadModel } from './assets';
 import { EXTENT } from './terrain';
 import { LOW } from './scene';
+import { kitMaterial, kitModule } from './castlekit';
 
 /** many copies of a small CC0 model, drawn as one InstancedMesh per material */
 export class Instancer {
@@ -118,6 +119,11 @@ function buildBridges(t: Terrain, parent: THREE.Object3D) {
     const along = Math.atan2(b[1] - a[1], b[0] - a[0]);
     const len = (m.creekWidth ?? 6) + 6, h = Math.max(t.height(x, y), t.height(x + 4, y), t.height(x - 4, y)) + 0.9;
     const g = new THREE.Group(); g.position.set(x, h, y); g.rotation.y = -along;
+    const kb = kitModule('bridge');
+    if (kb) { // Blender stone bridge, stretched to the water's width
+      const mb = new THREE.Mesh(kb, kitMaterial); mb.scale.set(1, 1, len / 16); mb.position.y = -0.8; mb.castShadow = mb.receiveShadow = true;
+      g.add(mb); parent.add(g); continue;
+    }
     const deck = new THREE.Mesh(new THREE.BoxGeometry(5.5, 0.35, len), wood); deck.castShadow = deck.receiveShadow = true; g.add(deck);
     for (const s of [-1, 1]) {
       const rail = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.25, len), dark); rail.position.set(s * 2.6, 0.9, 0); g.add(rail);

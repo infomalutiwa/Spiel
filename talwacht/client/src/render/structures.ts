@@ -69,7 +69,7 @@ export class StructureViews {
       if (s.kind === 'wall') continue;
       seen.add(s.id);
       const mask = isWallish(s.kind) ? wallMask(isWall, isCliff, s.cx, s.cy) : 0;
-      const k = `${s.kind}:${s.level}:${s.pitch}:${damageOf(s)}:${mask}:${Math.round(progressOf(s) * 10)}:${s.spent ? 'x' : ''}`;
+      const k = `${kitVersion}:${s.kind}:${s.level}:${s.pitch}:${damageOf(s)}:${mask}:${Math.round(progressOf(s) * 10)}:${s.spent ? 'x' : ''}`;
       let v = this.views.get(s.id);
       if (!v || v.key !== k) {
         if (v) this.dispose(v);
@@ -136,14 +136,14 @@ export class StructureViews {
     const alongX = !!(mask & (4 | 64)) || !(mask & (1 | 16));
     const faceOut = alongX ? 0 : (keepSide > 0 ? -Math.PI / 2 : Math.PI / 2);
 
-    if (s.kind === 'keep') root.add(mesh(this.geo(`keep:${s.level}`, () => keepGeometry(s.level))));
+    if (s.kind === 'keep') root.add(mesh(this.geo(`keep:${kitVersion}:${s.level}`, () => keepGeometry(s.level))));
     else if (s.kind === 'gate') {
       const parts = gateParts(s.level, alongX);
       root.add(mesh(parts.frame));
       const door = mesh(parts.door); root.add(door); view.door = door;
       if (parts.portcullis) { const p = mesh(parts.portcullis); root.add(p); view.port = p; }
     } else if (STRUCTURES[s.kind].cat === 'tower') {
-      root.add(mesh(this.geo(`t:${s.kind}:${s.level}`, () => towerGeometry(s.kind, s.level))));
+      root.add(mesh(this.geo(`t:${kitVersion}:${s.kind}:${s.level}`, () => towerGeometry(s.kind, s.level))));
       const plat = towerPlatform(s.kind, s.level);
       if (s.kind === 'ballista' || s.kind === 'tower_catapult') {
         void modelInstance(s.kind === 'ballista' ? 'siege-ballista' : 'siege-catapult', s.kind === 'ballista' ? 3.4 : 3.8).then(o => { if (o) { o.position.y = plat + 0.15; o.rotation.y = Math.PI; root.add(o); } });
