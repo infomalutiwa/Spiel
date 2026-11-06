@@ -21,7 +21,7 @@ class AudioSys {
   private musicBus?: GainNode;
   private bufs = new Map<string, AudioBuffer[]>();
   private recent: number[] = [];
-  muted = (() => { try { return localStorage.getItem('bw-mute') === '1'; } catch { return false; } })();
+  muted = (() => { try { return localStorage.getItem('tw-mute') === '1'; } catch { return false; } })();
   private musicTimer = 0;
   private beat = 0;
 
@@ -42,7 +42,7 @@ class AudioSys {
 
   toggleMute() {
     this.muted = !this.muted;
-    try { localStorage.setItem('bw-mute', this.muted ? '1' : '0'); } catch { /* private mode */ }
+    try { localStorage.setItem('tw-mute', this.muted ? '1' : '0'); } catch { /* private mode */ }
     if (this.master) this.master.gain.value = this.muted ? 0 : 1;
     return this.muted;
   }

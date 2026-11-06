@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { clamp, type MapDef } from '@talwacht/shared';
 import { onViewport, viewportSize } from '../viewport';
 import { Post } from './post';
+import { loadSky, setAnisotropy } from './textures';
 
 export const LOW = new URLSearchParams(location.search).get('q') === 'low';
 const MOBILE = matchMedia('(pointer: coarse)').matches;
@@ -28,6 +29,7 @@ export class World {
   post: Post | null = null;
   look: Look = LOOKS.green;
   night = 0;
+  hdr = false;
   private skyMat: THREE.ShaderMaterial;
   heightAt: (x: number, z: number) => number = () => 0;
 
@@ -54,6 +56,8 @@ export class World {
     const sky = new THREE.Mesh(new THREE.SphereGeometry(2400, 24, 12), this.skyMat);
     sky.frustumCulled = false; sky.renderOrder = -1;
     this.scene.add(sky);
+    setAnisotropy(Math.min(8, this.renderer.capabilities.getMaxAnisotropy()));
+    if (!LOW) loadSky(this.renderer, this.scene, () => { sky.visible = false; this.hdr = true; this.applyLook(); });
     this.scene.fog = new THREE.Fog('#d9dcc4', 500, 1600);
     if (!LOW) this.post = new Post(this.renderer, this.scene, this.camera, MOBILE);
     const resize = () => {
@@ -79,6 +83,7 @@ export class World {
     this.hemi.groundColor.set(L.hemiGround).lerp(new THREE.Color('#1c2030'), n);
     this.hemi.intensity = 1.0 - n * 0.55;
     this.renderer.toneMappingExposure = L.exposure * (1 - n * 0.25);
+    if (this.hdr) { this.scene.backgroundIntensity = 0.95 * (1 - n * 0.88); this.scene.environmentIntensity = 0.55 * (1 - n * 0.7); }
   }
 
   /** place the camera from the rig and keep the sun's shadow box on what we look at */
