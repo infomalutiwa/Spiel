@@ -29,8 +29,12 @@ export interface Structure {
   research: { id: SmithyId; left: number; total: number } | null;
   /** seconds a miner has been digging under this cell */
   mined: number;
-  /** stone ammunition consumed by catapults is taken from the shared stock; this flags "no stone" */
+  /** catapult had no stone for its last shot (HUD hint) */
   dry: number;
+  /** hit points still to be restored by a running repair */
+  fix: number;
+  /** everything paid for this structure (build + upgrades): selling refunds half */
+  paid: Res;
 }
 
 /** ids at or above this are structures when used as an attack target */
