@@ -131,13 +131,7 @@ diffuseColor.rgb *= clamp(det, 0.35, snowTheme ? 1.15 : 1.8);`)
 export function buildWater(t: Terrain): THREE.Mesh | null {
   const m = t.map;
   if (!m.creek) return null;
-  // smooth the bends (Chaikin) so the creek flows instead of zig-zagging
-  let pts: [number, number][] = m.creek;
-  for (let it = 0; it < 3; it++) {
-    const out: [number, number][] = [pts[0]];
-    for (let i = 0; i + 1 < pts.length; i++) { const [ax, ay] = pts[i], [bx, by] = pts[i + 1]; out.push([ax * 0.75 + bx * 0.25, ay * 0.75 + by * 0.25], [ax * 0.25 + bx * 0.75, ay * 0.25 + by * 0.75]); }
-    out.push(pts[pts.length - 1]); pts = out;
-  }
+  const pts = m.creek;
   const w = (m.creekWidth ?? 6) / 2 + 1.2;
   // resample the polyline every 3 m
   const samp: [number, number][] = [];
@@ -161,13 +155,27 @@ export function buildWater(t: Terrain): THREE.Mesh | null {
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   g.setIndex(idx); g.computeVertexNormals();
-  const mat = new THREE.MeshStandardMaterial({ color: PAL[m.theme].water, roughness: 0.15, metalness: 0.15, transparent: true, opacity: 0.88 });
+  // physically based water: dark deep middle, lighter shallows, foam at the banks, flowing ripples that reflect the sky
+  const mat = new THREE.MeshPhysicalMaterial({ color: PAL[m.theme].water, roughness: 0.06, metalness: 0, transparent: true, opacity: 0.9, clearcoat: 0.6, clearcoatRoughness: 0.08, envMapIntensity: 1.3 });
   mat.onBeforeCompile = sh => {
     sh.uniforms.time = { value: 0 };
     (mat.userData as { shader?: unknown }).shader = sh;
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec2 vUv2;').replace('#include <uv_vertex>', '#include <uv_vertex>\nvUv2 = uv;');
-    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float time; varying vec2 vUv2;')
-      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\nfloat ripple = sin(vUv2.y * 2.3 - time * 1.6 + sin(vUv2.x * 5.0 + vUv2.y) * 1.2) * 0.5 + 0.5;\ntotalEmissiveRadiance += vec3(0.02, 0.04, 0.05) * ripple;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', `#include <common>
+uniform float time; varying vec2 vUv2;
+float wv(vec2 p) { return sin(p.x * 1.7 + p.y * 0.9) * 0.5 + sin(p.x * -1.1 + p.y * 2.3 + 1.3) * 0.35 + sin(p.x * 3.1 - p.y * 1.4 + 2.1) * 0.15; }`)
+      .replace('#include <color_fragment>', `#include <color_fragment>
+float edge = abs(vUv2.x - 0.5) * 2.0;
+diffuseColor.rgb = mix(diffuseColor.rgb * 0.55, diffuseColor.rgb * 1.25 + vec3(0.06, 0.08, 0.05), smoothstep(0.2, 0.95, edge));
+float foam = smoothstep(0.82, 1.0, edge) * (0.55 + 0.45 * sin(vUv2.y * 40.0 - time * 3.0 + vUv2.x * 9.0));
+diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.92, 0.95, 0.95), foam * 0.55);
+diffuseColor.a *= mix(0.95, 0.55, smoothstep(0.7, 1.0, edge));`)
+      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+{ vec2 p = vec2(vUv2.x * 6.0, vUv2.y * 7.0 - time * 1.3); float e = 0.05;
+  float h0 = wv(p), hx = wv(p + vec2(e, 0.0)), hy = wv(p + vec2(0.0, e));
+  vec3 pn = normalize(vec3(-(hx - h0) / e * 0.12, 1.0, -(hy - h0) / e * 0.12));
+  normal = normalize((viewMatrix * vec4(pn, 0.0)).xyz); }`);
   };
   const mesh = new THREE.Mesh(g, mat);
   mesh.receiveShadow = true; mesh.name = 'water';

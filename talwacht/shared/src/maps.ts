@@ -40,6 +40,19 @@ function at(sp: Spine, y: number): [number, number] {
   const s = t * t * (3 - 2 * t);
   return [lerp(x0, x1, s), lerp(w0, w1, s)];
 }
+/** Chaikin corner cutting: smooth flowing curves from a few control points (keeps both ends) */
+export function smoothLine(pts: [number, number][], iterations = 3): [number, number][] {
+  let p = pts;
+  for (let it = 0; it < iterations; it++) {
+    const out: [number, number][] = [p[0]];
+    for (let i = 0; i + 1 < p.length; i++) {
+      const [ax, ay] = p[i], [bx, by] = p[i + 1];
+      out.push([ax * 0.75 + bx * 0.25, ay * 0.75 + by * 0.25], [ax * 0.25 + bx * 0.75, ay * 0.25 + by * 0.75]);
+    }
+    out.push(p[p.length - 1]); p = out;
+  }
+  return p.map(([x, y]) => [Math.round(x * 10) / 10, Math.round(y * 10) / 10]);
+}
 const edgesOf = (sp: Spine) => sp.map(([y, x, w]) => ({ y, left: x - w, right: x + w }));
 /** a lane following the centre line at a side offset (fraction of the half-width) that fades out by `mergeY` */
 function lane(sp: Spine, off: number, mergeY: number, endY: number, step = 60): [number, number][] {
@@ -48,7 +61,7 @@ function lane(sp: Spine, off: number, mergeY: number, endY: number, step = 60): 
     const [x, w] = at(sp, y), k = Math.max(0, 1 - y / mergeY);
     pts.push([Math.round(x + off * w * k), y]);
   }
-  return pts;
+  return smoothLine(pts);
 }
 
 // ---------- Grüntal: a meandering meadow valley with side basins ----------
@@ -72,7 +85,7 @@ export const MAPS: Record<string, MapDef> = {
       { id: 1, opensAt: 6, pts: lane(G, -0.55, 700, 760) },
       { id: 2, opensAt: 10, pts: lane(G, 0.55, 700, 760) },
     ],
-    creek: [[470, 940], [440, 800], [470, 690], [420, 560], [500, 420], [470, 280], [560, 140], [600, 0]], creekWidth: 7,
+    creek: smoothLine([[470, 940], [440, 800], [470, 690], [420, 560], [500, 420], [470, 280], [560, 140], [600, 0]]), creekWidth: 7,
     forests: [[130, 470, 55], [610, 290, 45], [300, 160, 40], [560, 700, 35], [240, 760, 30]],
     rocks: [[255, 360, 34], [475, 565, 30], [420, 830, 18]],
     meadows: [[380, 470, 70], [330, 260, 60], [420, 650, 50], [180, 120, 60]],
@@ -88,7 +101,7 @@ export const MAPS: Record<string, MapDef> = {
       { id: 0, opensAt: 1, pts: lane(KL, 0, 1, 860) },
       { id: 1, opensAt: 6, pts: lane(KL, -0.6, 230, 260) },
     ],
-    creek: [[150, 330], [240, 360], [330, 370], [400, 350]], creekWidth: 7,
+    creek: smoothLine([[150, 330], [240, 360], [330, 370], [400, 350]]), creekWidth: 7,
     forests: [[110, 760, 50], [420, 720, 40], [270, 40, 50]],
     rocks: [[300, 120, 30], [230, 450, 20], [330, 540, 18], [210, 705, 26]],
     meadows: [[280, 770, 80], [150, 30, 50]],
@@ -105,7 +118,7 @@ export const MAPS: Record<string, MapDef> = {
       { id: 1, opensAt: 6, pts: lane(FL, -0.6, 640, 700) },
       { id: 2, opensAt: 10, pts: lane(FL, 0.6, 640, 700) },
     ],
-    creek: [[0, 300], [160, 330], [300, 300], [420, 340], [560, 310], [700, 350], [780, 330]], creekWidth: 16,
+    creek: smoothLine([[0, 300], [160, 330], [300, 300], [420, 340], [560, 310], [700, 350], [780, 330]]), creekWidth: 16,
     forests: [[110, 600, 60], [680, 560, 55], [200, 150, 60], [620, 120, 55]],
     rocks: [[250, 525, 30], [560, 645, 26]],
     meadows: [[400, 470, 90], [300, 680, 60], [500, 160, 80]],
@@ -122,7 +135,7 @@ export const MAPS: Record<string, MapDef> = {
       { id: 1, opensAt: 6, pts: lane(WP, -0.55, 380, 400) },
       { id: 2, opensAt: 10, pts: lane(WP, 0.55, 380, 400) },
     ],
-    creek: [[340, 940], [380, 800], [340, 700]], creekWidth: 6,
+    creek: smoothLine([[340, 940], [380, 800], [340, 700]]), creekWidth: 6,
     forests: [[150, 230, 50], [500, 680, 45], [330, 60, 40]],
     rocks: [[235, 125, 34], [455, 275, 30], [330, 460, 16]],
     meadows: [[330, 760, 60]],
