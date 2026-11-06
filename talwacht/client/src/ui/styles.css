@@ -145,3 +145,16 @@ body.rain #c { filter: saturate(.75) brightness(.92); }
 @media (max-width: 760px) { .bottom { width: calc(100vw - 290px); min-width: 280px; } .left { width: 120px; } .right { width: 190px; } .tc { width: 40vw; } }
 /* touch targets: at least 32 px everywhere */
 .wtop .btn.small { min-height: 32px; } #menuBtn { min-width: 40px; min-height: 36px; font-size: 16px; } .sq.all { min-height: 34px; }
+
+/* building guide */
+#btip .what { color: #f3e6c8; font-size: 11px; }
+.codex { position: fixed; inset: 0; z-index: 60; background: #0008; display: flex; align-items: center; justify-content: center; padding: 10px; }
+.codex .panel { width: min(560px, 100%); max-height: 92vh; display: flex; flex-direction: column; padding: 10px 12px; }
+.codex .sph { display: flex; justify-content: space-between; align-items: center; font-size: 15px; }
+.codex .intro { font-size: 12px; opacity: .9; margin: 6px 0; }
+.codex .list { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.codex h3 { margin: 10px 0 4px; font-size: 13px; color: var(--gold); }
+.codex .ce { display: flex; gap: 8px; padding: 4px 0; border-bottom: 1px solid #ffffff14; }
+.codex .ce .ic { font-size: 20px; width: 26px; text-align: center; }
+.codex .ce p { margin: 2px 0 0; font-size: 12px; opacity: .88; }
+.codex .ce small { opacity: .75; }

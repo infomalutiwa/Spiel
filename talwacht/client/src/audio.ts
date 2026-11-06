@@ -12,7 +12,7 @@ const FILES: Record<string, string[]> = {
   draw: ['drawKnife1', 'clothBelt'],
 };
 
-type Sfx = keyof typeof FILES | 'arrow' | 'bolt' | 'magic' | 'heal' | 'rally' | 'horn' | 'win' | 'lose' | 'level';
+type Sfx = keyof typeof FILES | 'arrow' | 'bolt' | 'magic' | 'heal' | 'rally' | 'horn' | 'win' | 'lose' | 'level' | 'hammer';
 
 class AudioSys {
   private ctx?: AudioContext;
@@ -114,6 +114,7 @@ class AudioSys {
       case 'magic': this.tone(660, t, 0.5, 0.18 * vol, 'sine', this.sfxBus!, 1.5); this.tone(990, t + 0.05, 0.5, 0.12 * vol); break;
       case 'heal': this.tone(880, t, 0.35, 0.12 * vol); this.tone(1320, t + 0.08, 0.35, 0.08 * vol); break;
       case 'rally': [392, 494, 587].forEach((f, i) => this.tone(f, t + i * 0.09, 0.6, 0.16 * vol, 'triangle')); break;
+      case 'hammer': this.tone(220 + Math.random() * 60, t, 0.07, 0.3 * vol, 'square', this.sfxBus!, 0.6); this.noise(t, 0.06, 0.25 * vol, 1800, 700); break; // a mallet on timber
       case 'level': [523, 659, 784].forEach((f, i) => this.tone(f, t + i * 0.07, 0.4, 0.14 * vol, 'triangle')); break;
       case 'horn': this.tone(165, t, 1.1, 0.3 * vol, 'sawtooth'); this.tone(247, t + 0.35, 1.0, 0.25 * vol, 'sawtooth'); break;
       case 'win': [523, 659, 784, 1047].forEach((f, i) => this.tone(f, t + i * 0.16, 0.9, 0.22 * vol, 'triangle')); break;

@@ -1,9 +1,9 @@
 import * as THREE from 'three';
-import { buildTerrain, MAPS, DEFAULT_MAP, STRUCTURES, type Snapshot, type Terrain } from '@talwacht/shared';
+import { buildTerrain, MAPS, DEFAULT_MAP, STRUCTURES, type Snapshot, type StructSnap, type Terrain } from '@talwacht/shared';
 import { initViewport } from './viewport';
 import { World } from './render/scene';
 import { buildTerrainMesh, buildWater } from './render/terrain';
-import { buildScenery } from './render/scenery';
+import { buildScenery, hideSceneryWhere } from './render/scenery';
 import { StructureViews } from './render/structures';
 import { UnitViews } from './render/units';
 import { Effects } from './render/effects';
@@ -42,11 +42,18 @@ export async function loadMap(id: string) {
   return t;
 }
 
+/** trees and rocks vanish from built ground (one cell of margin) */
+function clearScenery(structs: Iterable<StructSnap>) {
+  const cells = new Set<number>();
+  for (const s of structs) for (let dx = -1; dx <= s.w; dx++) for (let dy = -1; dy <= s.h; dy++) cells.add((s.cy + dy) * 4096 + s.cx + dx);
+  hideSceneryWhere((x, y) => cells.has(Math.floor(y / 4) * 4096 + Math.floor(x / 4)));
+}
+
 // ---------- the running game ----------
 interface Game { conn: Connection; sv: StructureViews; units: UnitViews; fx: Effects; ctl: Controls; hud: Hud }
 let game: Game | null = null;
 const INTERP = 110;
-let last = performance.now(), miniT = 0, lobbyA = 0;
+let last = performance.now(), miniT = 0, lobbyA = 0, sceneryKey = -1;
 
 function loop(now: number) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
@@ -56,6 +63,10 @@ function loop(now: number) {
     const { conn, sv, units, fx, ctl, hud } = game;
     const ip = interpolation(conn.snaps, now - INTERP), s = conn.latest();
     sv.sync(conn.structs, dt);
+    if (conn.structRev !== sceneryKey) { // clear trees and rocks off built ground
+      sceneryKey = conn.structRev;
+      clearScenery(conn.structs.values());
+    }
     units.sync(ip, conn.you, ctl.selected, dt);
     fx.update(dt, units, conn.structs.values());
     ctl.frame(dt, s);
@@ -71,7 +82,7 @@ function loop(now: number) {
 }
 requestAnimationFrame(loop);
 
-const SFX: Record<string, Parameters<typeof audio.play>[0]> = { boom: 'siege', fire: 'siege', crash: 'siege', arrow: 'arrow', throw: 'siege', ping: 'bell', trap: 'punch', gate: 'siege' };
+const SFX: Record<string, Parameters<typeof audio.play>[0]> = { boom: 'siege', fire: 'siege', crash: 'siege', arrow: 'arrow', throw: 'siege', ping: 'bell', trap: 'punch', gate: 'siege', place: 'siege', hammer: 'hammer', built: 'level' };
 
 async function enter(conn: Connection) {
   history.replaceState(null, '', `?room=${conn.code}`);
@@ -86,7 +97,7 @@ async function enter(conn: Connection) {
   game = { conn, sv, units, fx, ctl, hud };
   fx.onSound = (n, x, z) => {
     const d = Math.hypot(x - world.target.x, z - world.target.z);
-    audio.play(SFX[n] ?? 'click', Math.max(0, 1 - d / 260) * (n === 'arrow' ? 0.25 : 0.8));
+    audio.play(SFX[n] ?? 'click', Math.max(0, 1 - d / 260) * (n === 'arrow' ? 0.25 : n === 'hammer' ? 0.35 : 0.8));
   };
   const keep = MAPS[conn.mapId].keep;
   world.target.set(keep.x, 0, keep.y - 60); world.dist = 190; world.yaw = 0;
@@ -181,7 +192,7 @@ if (params.get('gallery') === 'units') {
   loadMap('gruental').then(t => {
     const views = new StructureViews(t, world.content);
     const layout = castleLayout();
-    views.sync(layout, 0.016);
+    views.sync(layout, 0.016); clearScenery(layout.values());
     setInterval(() => views.sync(layout, 0.05), 50);
     world.target.set(t.map.keep.x - 20, 0, t.map.keep.y - 50); world.dist = Number(params.get('dist') ?? 95); world.yaw = Number(params.get('yaw') ?? 0.25);
     if (params.has('tx')) world.target.set(Number(params.get('tx')), 0, Number(params.get('tz')));

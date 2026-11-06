@@ -3,7 +3,7 @@ import {
   type ClientMsg, type Difficulty, type GameState, type PlayerId, type ServerMsg, type Snapshot, type StructSnap, type TalentId, type WireSnapshot,
 } from '@talwacht/shared';
 import { trapSpent } from '../sim/traps';
-import { applyCommand, armyCap, createGame, deserialize, rate, serialize, soldiers, tick, timeline } from '../sim/index';
+import { applyCommand, armyCap, createGame, starterBase, deserialize, rate, serialize, soldiers, tick, timeline } from '../sim/index';
 
 export interface Socket { send(data: string): void; close(): void }
 export interface RoomOpts { mapId: string; diff: Difficulty; talents: TalentId[]; unlocks: string[]; save?: string; debugWaves?: number }
@@ -38,6 +38,7 @@ export class Room {
     const talents = (Array.isArray(o.talents) ? o.talents : []).filter(t => TALENTS.some(x => x.id === t)).slice(0, 3);
     const unlocks = (Array.isArray(o.unlocks) ? o.unlocks : []).filter(u => UNLOCKS.some(x => x.id === u));
     const s = createGame(map, diff, (Math.random() * 2 ** 32) >>> 0, talents, unlocks);
+    starterBase(s); // a small working settlement to start from
     if (o.debugWaves && o.debugWaves > 0) { s.waveCount = Math.min(s.waveCount, Math.floor(o.debugWaves)); s.debugWaves = s.waveCount; }
     return new Room(code, s);
   }

@@ -74,7 +74,10 @@ export function buildTerrainMesh(t: Terrain): THREE.Mesh {
   const idx: number[] = [];
   for (let iy = 0; iy < ny; iy++) for (let ix = 0; ix < nx; ix++) {
     const p = iy * (nx + 1) + ix, q = p + nx + 1;
-    idx.push(p, q, p + 1, p + 1, q, q + 1);
+    // split each quad along the diagonal with the smaller height jump, so cliffs running either way stay clean (no zigzag)
+    const d1 = Math.abs(pos[p * 3 + 1] - pos[(q + 1) * 3 + 1]), d2 = Math.abs(pos[(p + 1) * 3 + 1] - pos[q * 3 + 1]);
+    if (d2 <= d1) idx.push(p, q, p + 1, p + 1, q, q + 1);
+    else idx.push(p, q, q + 1, p, q + 1, p + 1);
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3));

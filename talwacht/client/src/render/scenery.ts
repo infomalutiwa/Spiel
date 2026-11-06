@@ -6,9 +6,22 @@ import { LOW } from './scene';
 import { kitMaterial, kitModule } from './castlekit';
 
 /** many copies of a small CC0 model, drawn as one InstancedMesh per material */
+const ALL: Instancer[] = [];
+/** hide trees, rocks and bushes standing on built ground (structures were placed over them) */
+export function hideSceneryWhere(blocked: (x: number, y: number) => boolean) { for (const i of ALL) i.mask(blocked); }
+
 export class Instancer {
   private items: { x: number; y: number; z: number; r: number; s: number }[] = [];
-  constructor(private parent: THREE.Object3D, private name: string, private height: number, private shadow = true, private tint?: THREE.Color, private rock?: string) {}
+  private meshes: { im: THREE.InstancedMesh; mats: THREE.Matrix4[] }[] = [];
+  private hidden: boolean[] = [];
+  mask(blocked: (x: number, y: number) => boolean) {
+    const zero = new THREE.Matrix4().makeScale(0, 0, 0);
+    let changed = false;
+    this.items.forEach((it, i) => { const h = blocked(it.x, it.z); if (h !== !!this.hidden[i]) { this.hidden[i] = h; changed = true; } });
+    if (!changed) return;
+    for (const { im, mats } of this.meshes) { mats.forEach((m, i) => im.setMatrixAt(i, this.hidden[i] ? zero : m)); im.instanceMatrix.needsUpdate = true; }
+  }
+  constructor(private parent: THREE.Object3D, private name: string, private height: number, private shadow = true, private tint?: THREE.Color, private rock?: string) { ALL.push(this); }
   add(x: number, y: number, z: number, r: number, s: number) { this.items.push({ x, y, z, r, s }); }
   get size() { return this.items.length; }
   async build() {
@@ -28,14 +41,15 @@ export class Instancer {
       if (/wood|bark/i.test(mat.name)) mat.color.set('#6b4a32');
       if (this.tint && /leaf|grass/i.test(mat.name)) mat.color.multiply(this.tint);
       if (this.rock && !/grass|leaf/i.test(mat.name)) mat.color.set(this.rock);
-      if (this.rock && /grass/i.test(mat.name)) mat.color.set('#557f36');
+      if (/grass/i.test(mat.name)) mat.color.set(this.rock ? '#5a9a33' : '#4f9230'); // Kenney's teal grass → our meadow green
       const local = base.clone().multiply(mesh.matrixWorld);
-      const im = new THREE.InstancedMesh(mesh.geometry, mat, this.items.length);
+      const im = new THREE.InstancedMesh(mesh.geometry, mat, this.items.length), mats: THREE.Matrix4[] = [];
       this.items.forEach((it, i) => {
         q.setFromAxisAngle(up, it.r);
         m4.compose(new THREE.Vector3(it.x, it.y, it.z), q, new THREE.Vector3(it.s, it.s, it.s)).multiply(local);
-        im.setMatrixAt(i, m4);
+        im.setMatrixAt(i, m4); mats.push(m4.clone());
       });
+      this.meshes.push({ im, mats });
       im.castShadow = this.shadow; im.receiveShadow = true;
       im.computeBoundingSphere();
       this.parent.add(im);
@@ -45,6 +59,7 @@ export class Instancer {
 
 /** trees, rocks, bushes and flowers placed by rules (forest clumps with ragged edges, rocks at cliff feet) */
 export async function buildScenery(t: Terrain, parent: THREE.Object3D) {
+  ALL.length = 0; // a new map: forget the old instancers
   const m = t.map, R = rng(m.seed * 977 + 1), snow = m.theme === 'snow';
   const group = new THREE.Group(); group.name = 'scenery'; parent.add(group);
   const autumn = new THREE.Color('#ffd9a0');
@@ -88,7 +103,7 @@ export async function buildScenery(t: Terrain, parent: THREE.Object3D) {
       const flat = h > 48;
       const clump = fbm(x * 0.02, y * 0.02, m.seed + 77); // woods with glades
       if (flat && R() < 0.012 + clump * 0.03) { pick(copses).add(x, h - 0.5, y, R() * 6.28, 0.8 + R() * 0.5); continue; }
-      if ((flat && R() < (out < 40 ? 0.14 : 0.03) + clump * 0.2) || (!flat && R() < 0.03)) pick(out < 30 ? trees : farTrees).add(x, h - 0.3, y, R() * 6.28, 0.8 + R() * 0.7);
+      if ((flat && R() < (out < 40 ? 0.14 : 0.03) + clump * 0.2) ) pick(out < 30 ? trees : farTrees).add(x, h - 0.3, y, R() * 6.28, 0.8 + R() * 0.7);
       else if (out < 14 && R() < 0.06) pick(rocks).add(x, h - 0.6, y, R() * 6.28, 0.7 + R() * 1.0);
       continue;
     }

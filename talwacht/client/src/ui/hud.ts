@@ -229,18 +229,36 @@ export class Hud {
     }
   }
 
+  /** the building guide: every structure with what it does, cost, build time and upgrades */
+  private showCodex() {
+    document.querySelector('.codex')?.remove();
+    const el = document.createElement('div');
+    el.className = 'codex';
+    const body = CATS.map(c => `<h3>${c.icon} ${esc(c.name)}</h3>` + c.items.map(k => {
+      const d = STRUCTURES[k], ups = d.up.length ? ` · ⬆️ ${d.up.length + 1} Stufen` : '';
+      return `<div class="ce"><span class="ic">${d.icon}</span><div><b>${esc(d.name)}</b> <small>${costText(d.cost)} · ⏱ ${Math.round(d.build)} s${ups}</small><p>${esc(d.blurb)}</p></div></div>`;
+    }).join('')).join('');
+    el.innerHTML = `<div class="panel"><div class="sph"><b>📜 Gebäude-Übersicht</b><button class="x">✕</button></div>
+      <p class="intro">Bauen: Gebäude unten wählen, Ort antippen, ✔. Antippen eines fertigen Gebäudes: ⬆️ Verbessern, 🔧 Reparieren, Truppen ausbilden oder abreißen. Beschädigte Mauern rechtzeitig reparieren – Steinmauern halten Rammen viel länger auf als Palisaden.</p>
+      <div class="list">${body}</div></div>`;
+    el.addEventListener('click', e => { if (e.target === el || (e.target as HTMLElement).closest('.x')) el.remove(); });
+    document.getElementById('ui')!.appendChild(el);
+  }
+
   // ---------- build bar ----------
   private renderBuild() {
     const mode = this.ctl.mode;
     const cat = CATS.find(c => c.id === this.cat)!;
-    const tabs = CATS.map(c => `<button class="tab ${c.id === this.cat ? 'on' : ''}" data-cat="${c.id}">${c.icon}<span>${c.name}</span></button>`).join('');
+    const tabs = CATS.map(c => `<button class="tab ${c.id === this.cat ? 'on' : ''}" data-cat="${c.id}">${c.icon}<span>${c.name}</span></button>`).join('')
+      + `<button class="tab" id="codex">ℹ️<span>Infos</span></button>`;
     const items = cat.items.map(k => {
       const d = STRUCTURES[k], locked = !!d.unlock && !this.unlocks.includes(d.unlock);
       return `<button class="item ${mode.k === 'build' && mode.kind === k ? 'on' : ''} ${locked ? 'dis' : ''}" data-k="${k}" ${locked ? 'disabled' : ''}>${d.icon}<span>${esc(d.name)}</span><small>${locked ? '🔒' : costText(d.cost)}</small></button>`;
     }).join('');
     const confirm = mode.k === 'build' ? `<div class="confirm"><button class="btn gold" id="ok">✔</button><button class="btn ghost" id="no">✕</button></div>` : '';
     this.els.buildbar.innerHTML = `<div class="tabs">${tabs}</div><div class="items">${items}</div>${confirm}<div id="btip"></div>`;
-    this.els.buildbar.querySelectorAll<HTMLElement>('.tab').forEach(b => b.addEventListener('click', () => { this.cat = b.dataset.cat!; this.renderBuild(); }));
+    this.els.buildbar.querySelectorAll<HTMLElement>('.tab[data-cat]').forEach(b => b.addEventListener('click', () => { this.cat = b.dataset.cat!; this.renderBuild(); }));
+    this.els.buildbar.querySelector('#codex')?.addEventListener('click', () => this.showCodex());
     this.els.buildbar.querySelectorAll<HTMLElement>('.item').forEach(b => b.addEventListener('click', () => {
       const k = b.dataset.k as StructId;
       this.ctl.setBuild(this.ctl.mode.k === 'build' && this.ctl.mode.kind === k ? null : k);
@@ -258,7 +276,7 @@ export class Hud {
     const ok = this.ctl.preview.filter(([x, y]) => this.ctl.cellOk(x, y, mode.kind)).length;
     const mult = mode.kind === 'wall' || d.cat === 'trap' ? ok : 1;
     const cost = mode.kind === 'wall' || d.cat === 'trap' ? Object.fromEntries(RES_KEYS.map(k => [k, d.cost[k] * mult])) : d.cost;
-    tip.innerHTML = `<b>${d.icon} ${esc(d.name)}</b> ${n ? `· ${mult}${mode.kind === 'wall' ? ' Felder' : ''} · ${costText(cost)} · ${Math.round(d.build)} s` : ''}${n && ok < n ? ` · <span class="neg">${n - ok} blockiert</span>` : ''}<br><small>${esc(BUILD_HINT[mode.kind] ?? 'Ort antippen, dann ✔')}</small>`;
+    tip.innerHTML = `<b>${d.icon} ${esc(d.name)}</b> ${n ? `· ${mult}${mode.kind === 'wall' ? ' Felder' : ''} · ${costText(cost)} · ${Math.round(d.build)} s` : ''}${n && ok < n ? ` · <span class="neg">${n - ok} blockiert</span>` : ''}<br><span class="what">${esc(d.blurb)}</span><br><small>${esc(BUILD_HINT[mode.kind] ?? 'Ort antippen, dann ✔')}</small>`;
   }
 
   // ---------- overlays ----------

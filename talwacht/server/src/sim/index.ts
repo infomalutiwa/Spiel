@@ -12,3 +12,4 @@ export { serialize, deserialize } from './save';
 export { production, rate, armyCap, soldiers } from './economy';
 export { timeline } from './waves';
 export { slotPos } from './squads';
+export { starterBase } from './starter';

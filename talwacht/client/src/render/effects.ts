@@ -106,7 +106,28 @@ export class Effects {
     this.group.add(g); this.rubble.push({ obj: g, t: 0 });
   }
 
+  /** building feel: dust when ground is broken, sawdust and hammering while it rises, a cloud and fanfare when done, sparks on repairs */
+  private site = new Map<number, { build: boolean; hp: number }>();
+  private siteInit = false;
+  private construction(dt: number, structs: Iterable<StructSnap>) {
+    const seen = new Set<number>();
+    for (const st of structs) {
+      seen.add(st.id);
+      const x = (st.cx + st.w / 2) * CELL, z = (st.cy + st.h / 2) * CELL, y = this.h(x, z), r = st.w * CELL * 0.5;
+      const was = this.site.get(st.id), building = st.build > 0;
+      if (!was && this.siteInit && building) { this.puff(x, y + 0.3, z, '#cdbb98', 14 + st.w * 6, 1.8, { spread: r + 1, up: 1.2, life: 1.3 }); this.onSound('place', x, z); }
+      if (building && Math.random() < dt * 2.5) this.puff(x + (Math.random() - 0.5) * r * 2, y + 0.5 + Math.random() * 3, z + (Math.random() - 0.5) * r * 2, '#e2cfa4', 2, 0.6, { spread: 0.4, up: 0.6, life: 0.9 });
+      if (building && Math.random() < dt * 1.3) this.onSound('hammer', x, z);
+      if (was?.build && !building) { this.puff(x, y + 1, z, '#efe3c8', 22 + st.w * 8, 2.4, { spread: r + 1.5, up: 2.4, life: 1.6 }); this.puff(x, y + 3, z, '#ffd56a', 10, 0.7, { spread: r, up: 3, life: 1.0, add: true }); this.onSound('built', x, z); }
+      if (was && !building && st.hp > was.hp + 0.5 && Math.random() < dt * 6) this.puff(x + (Math.random() - 0.5) * r, y + 1 + Math.random() * 2, z + (Math.random() - 0.5) * r, '#ffcf6a', 2, 0.35, { spread: 0.3, up: 1.2, life: 0.5, add: true });
+      this.site.set(st.id, { build: building, hp: st.hp });
+    }
+    for (const id of [...this.site.keys()]) if (!seen.has(id)) this.site.delete(id);
+    this.siteInit = true;
+  }
+
   update(dt: number, units: UnitViews, structs: Iterable<StructSnap>) {
+    this.construction(dt, structs);
     // flames on burning buildings and soldiers
     for (const st of structs) if (st.burning && Math.random() < dt * 14) {
       const x = (st.cx + st.w / 2) * CELL + (Math.random() - 0.5) * st.w * CELL * 0.7, z = (st.cy + st.h / 2) * CELL + (Math.random() - 0.5) * st.h * CELL * 0.7;

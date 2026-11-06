@@ -57,10 +57,9 @@ export function buildTerrain(map: MapDef): Terrain {
     const out = outside(x, y);
     if (out > -6) {
       const o = Math.max(0, out + 2);
-      // terraced rock face: steep, with ledges and a ragged top
-      const face = Math.min(CLIFF_H, o * 3.4);
-      h += face * smooth(-6, 6, out) + (fbm(x * 0.07, y * 0.07, map.seed + 5) - 0.5) * Math.min(14, o * 0.7)
-        + (noise2(x * 0.22, y * 0.22, map.seed + 6) - 0.5) * Math.min(3.5, o * 0.4); // craggy rock face
+      // rock face: steep but resolvable by the 4-m render grid (no aliased spikes)
+      const face = Math.min(CLIFF_H, o * 2.1 + Math.max(0, o - 10) * 0.6);
+      h += face * smooth(-6, 6, out) + (fbm(x * 0.04, y * 0.04, map.seed + 5) - 0.5) * Math.min(10, o * 0.5);
       if (o > 16) h += (fbm(x * 0.012, y * 0.012, map.seed + 9) - 0.3) * 22 * smooth(16, 40, o); // rolling ridge tops
     }
     for (const [cx, cy, r, ch] of map.crags) {
