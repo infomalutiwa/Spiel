@@ -90,6 +90,8 @@ export class World {
     this.target.y += (ground - this.target.y) * 0.2;
     const cp = Math.cos(this.pitch), sp = Math.sin(this.pitch);
     this.camera.position.set(this.target.x + Math.sin(this.yaw) * this.dist * cp, this.target.y + this.dist * sp, this.target.z + Math.cos(this.yaw) * this.dist * cp);
+    const floor = this.heightAt(this.camera.position.x, this.camera.position.z) + 6; // never inside a cliff
+    if (this.camera.position.y < floor) this.camera.position.y = floor;
     this.camera.lookAt(this.target);
     const fogNear = this.dist * 1.25 + 120;
     const f = this.scene.fog as THREE.Fog; f.near = fogNear; f.far = fogNear + 900 + this.dist;

@@ -3,6 +3,8 @@ import { initViewport } from './viewport';
 import { World } from './render/scene';
 import { buildTerrainMesh, buildWater } from './render/terrain';
 import { buildScenery } from './render/scenery';
+import { StructureViews } from './render/structures';
+import { castleLayout } from './gallery';
 
 initViewport();
 const params = new URLSearchParams(location.search);
@@ -34,7 +36,17 @@ function loop(now: number) {
 }
 requestAnimationFrame(loop);
 
-if (params.get('view') === 'map') {
+if (params.get('gallery') === 'castle') {
+  loadMap('gruental').then(t => {
+    const views = new StructureViews(t, world.content);
+    const layout = castleLayout();
+    views.sync(layout, 0.016);
+    setInterval(() => views.sync(layout, 0.05), 50);
+    world.target.set(t.map.keep.x - 20, 0, t.map.keep.y - 50); world.dist = Number(params.get('dist') ?? 95); world.yaw = Number(params.get('yaw') ?? 0.25);
+    if (params.has('tx')) world.target.set(Number(params.get('tx')), 0, Number(params.get('tz')));
+    setTimeout(() => ((window as unknown as { __ready: boolean }).__ready = true), 2500);
+  });
+} else if (params.get('view') === 'map') {
   const id = params.get('map') ?? DEFAULT_MAP;
   loadMap(id).then(t => {
     const m = t.map;
