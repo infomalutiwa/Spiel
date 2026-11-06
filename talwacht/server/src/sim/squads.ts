@@ -10,6 +10,7 @@ import { makeUnit, nearby, unitById } from './units';
 import { CONTROLLED } from './movement';
 import { damage, damageStruct } from './combat';
 import type { Result } from './build';
+import { resetTrap, trapSpent } from './traps';
 
 const CLIMB = CONTROLLED + 1;
 const fail = (reason: string): Result => ({ ok: false, reason });
@@ -253,7 +254,7 @@ function supportTick(s: GameState, q: Squad, us: Unit[], dt: number) {
     for (const u of us) {
       let work: Structure | undefined, wd = 7;
       for (const st of s.structs) {
-        if (st.hp >= st.maxHp && st.burning <= 0 && !(STRUCTURES[st.kind].trap && st.state === 1)) continue;
+        if (st.hp >= st.maxHp && st.burning <= 0 && !trapSpent(st)) continue;
         const dd = Math.hypot((st.cx + st.w / 2) * CELL - u.x, (st.cy + st.h / 2) * CELL - u.y) - st.w * 2;
         if (dd < wd) { wd = dd; work = st; }
       }
@@ -261,7 +262,7 @@ function supportTick(s: GameState, q: Squad, us: Unit[], dt: number) {
       u.anim = 2; u.facing = Math.atan2((work.cy + 0.5) * CELL - u.y, (work.cx + 0.5) * CELL - u.x);
       if (work.burning > 0) work.burning = Math.max(0, work.burning - dt * 7);
       else if (work.hp < work.maxHp) work.hp = Math.min(work.maxHp, work.hp + d.repair * dt);
-      else if (STRUCTURES[work.kind].trap && work.state === 1) { work.state = 0; work.uses = STRUCTURES[work.kind].trap!.uses ?? 0; }
+      else if (trapSpent(work)) { resetTrap(work); s.sRev++; }
     }
   }
 }
@@ -344,3 +345,9 @@ handlers.disband = (s, p, cmd) => {
 };
 
 export { terrainOf, damageStruct };
+
+/** along-wall direction and outward normal of a rampart cell */
+export function wallNormal(s: GameState, st: Structure) {
+  const { ax, ay } = wallDir(s, st);
+  return { ax, ay, ...outward(s, st, ax, ay) };
+}
