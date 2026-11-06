@@ -5,7 +5,7 @@ import { STRUCTURES, STRUCT_IDS, towerDps } from './structures';
 import { DIFFICULTY, TECH, budget, BOSS_WAVES } from './waves';
 import { UNLOCKS, TALENTS, starsFor } from './meta';
 
-const total = (c: Record<string, number>) => Object.values(c).reduce((a, b) => a + b, 0);
+const total = (c: object) => (Object.values(c) as number[]).reduce((a, b) => a + b, 0);
 
 describe('data tables', () => {
   it('every troop, enemy and structure costs something and has hit points', () => {
