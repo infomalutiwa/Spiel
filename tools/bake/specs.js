@@ -129,4 +129,41 @@ window.SPECS = [
   }),
   mounted('raider_rider', SKEL + 'Characters/gltf/Skeleton_Warrior.glb', '#4a3b3f', '#1d1518', [], [{ bone: 'handslotr', file: SKEL + 'Assets/gltf/Skeleton_Blade.gltf' }]),
 ];
+
+// ---- Talwacht: human enemy army + extra troops (all CC0 KayKit Adventurers) ----
+const KNIGHT_GEAR = ['1H_Sword', '1H_Sword_Offhand', 'Badge_Shield', 'Rectangle_Shield', 'Spike_Shield', '2H_Sword', 'Round_Shield'];
+const keep = (all, ...k) => all.filter(n => !k.includes(n));
+/** long pole with an axe blade and spike, grip at the origin */
+const halberd = () => {
+  const g = new T.Group();
+  const shaft = mesh(new T.CylinderGeometry(0.035, 0.035, 2.5, 6), '#7a5230'); shaft.position.y = 0.5;
+  const blade = mesh(new T.BoxGeometry(0.04, 0.42, 0.34), '#c9d1d9'); blade.position.set(0, 1.55, 0.16);
+  const spike = mesh(new T.ConeGeometry(0.06, 0.4, 6), '#c9d1d9'); spike.position.y = 1.95;
+  g.add(shaft, blade, spike); return g;
+};
+/** wooden mallet for engineers */
+const mallet = () => {
+  const g = new T.Group();
+  const shaft = mesh(new T.CylinderGeometry(0.03, 0.03, 0.8, 6), '#8b5a2b'); shaft.position.y = 0.25;
+  const head = mesh(new T.BoxGeometry(0.34, 0.2, 0.2), '#6b4a2b'); head.position.y = 0.66;
+  g.add(shaft, head); return g;
+};
+window.SPECS.push(
+  mk('e_raider', ADV + 'Characters/gltf/Barbarian.glb', { hide: ['1H_Axe_Offhand', '2H_Axe', 'Mug', 'Barbarian_Round_Shield'],
+    clips: { idle: IDLE, walk: WALK, attack: { name: '1H_Melee_Attack_Chop', frames: 8, mode: 'once' }, death: DEATH } }),
+  mk('e_soldier', ADV + 'Characters/gltf/Knight.glb', { hide: keep(KNIGHT_GEAR, '1H_Sword', 'Round_Shield'),
+    clips: { idle: IDLE, walk: WALK, attack: { name: '1H_Melee_Attack_Slice_Diagonal', frames: 8, mode: 'once' }, death: DEATH } }),
+  mk('e_shield', ADV + 'Characters/gltf/Knight.glb', { hide: keep(KNIGHT_GEAR, '1H_Sword', 'Rectangle_Shield'),
+    clips: { idle: { name: 'Blocking', frames: 2 }, walk: { name: 'Walking_B', frames: 8 }, attack: { name: '1H_Melee_Attack_Stab', frames: 8, mode: 'once' }, death: DEATH } }),
+  mk('e_pioneer', ADV + 'Characters/gltf/Rogue_Hooded.glb', { hide: ['Knife_Offhand', '1H_Crossbow', '2H_Crossbow', 'Throwable'],
+    clips: { idle: IDLE, walk: WALK, attack: { name: '1H_Melee_Attack_Stab', frames: 8, mode: 'once' }, death: DEATH } }),
+  mk('e_warlord', ADV + 'Characters/gltf/Knight.glb', { hide: keep(KNIGHT_GEAR, '2H_Sword'),
+    clips: { idle: IDLE, walk: { name: 'Walking_B', frames: 8 }, attack: { name: '2H_Melee_Attack_Chop', frames: 8, mode: 'once' }, death: DEATH } }),
+  mk('engineer', ADV + 'Characters/gltf/Barbarian.glb', { hide: ['1H_Axe_Offhand', '1H_Axe', '2H_Axe', 'Mug', 'Barbarian_Round_Shield'],
+    attach: [{ bone: 'handslotr', proc: mallet }],
+    clips: { idle: IDLE, walk: WALK, attack: { name: '1H_Melee_Attack_Chop', frames: 8, mode: 'once' }, death: DEATH } }),
+  mk('halberdier', ADV + 'Characters/gltf/Knight.glb', { hide: KNIGHT_GEAR,
+    attach: [{ bone: 'handslotr', proc: halberd }],
+    clips: { idle: IDLE, walk: WALK, attack: { name: '1H_Melee_Attack_Stab', frames: 8, mode: 'once' }, death: DEATH } }),
+);
 window.specsReady = true;

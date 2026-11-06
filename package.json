@@ -5,13 +5,20 @@
   "workspaces": [
     "shared",
     "server",
-    "client"
+    "client",
+    "talwacht/shared",
+    "talwacht/server",
+    "talwacht/client"
   ],
   "scripts": {
     "test": "vitest run",
     "dev": "concurrently -n srv,web -c yellow,cyan \"npm run dev -w server\" \"npm run dev -w client\"",
     "build": "npm run build -w client",
-    "start": "npm run build && npm run start -w server"
+    "start": "npm run build && npm run start -w server",
+    "dev:tw": "concurrently -n srv,web -c yellow,cyan \"npm run dev -w @talwacht/server\" \"npm run dev -w @talwacht/client\"",
+    "build:tw": "npm run build -w @talwacht/client",
+    "start:tw": "npm run build:tw && npm run start -w @talwacht/server",
+    "start:bw": "npm run build && npm run start -w server"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",
