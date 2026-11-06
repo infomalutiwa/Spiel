@@ -2,3 +2,4 @@ node_modules
 dist
 .superpowers
 test-results
+/0[0-9]-*.png
