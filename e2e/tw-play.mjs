@@ -22,7 +22,7 @@ await b.waitForFunction(() => window.__tw?.game?.conn?.peerConnected, null, { ti
 await a.waitForTimeout(2500);
 await a.screenshot({ path: `${out}/02-start.png` });
 // the pre-built settlement up close, then the building guide
-await a.evaluate(() => { const w = window.__tw.world, k = [...window.__tw.game.conn.structs.values()].find(x => x.kind === 'keep'); w.target.set((k.cx + 2) * 4, 0, (k.cy + 2) * 4 - 34); w.dist = 120; });
+await a.evaluate(() => { const w = window.__tw.world, k = [...window.__tw.game.conn.structs.values()].find(x => x.kind === 'keep'); w.target.set((k.cx + 2) * 4, 0, (k.cy + 2) * 4 - 34); w.dist = 230; });
 await a.waitForTimeout(2500);
 await a.screenshot({ path: `${out}/02-base.png` });
 await a.click('#codex');

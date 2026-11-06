@@ -28,7 +28,7 @@ function place(s: GameState, kind: StructId, cx: number, cy: number, level = 1, 
 
 /**
  * A small working settlement at round start, so the first minutes are about expanding, not bootstrapping:
- * a stone wall across the main road with a gate and two bow towers, barracks and archery range, houses, a farm,
+ * a stone curtain wall across the whole valley (gate on the main road, bow towers along it), barracks and archery range, houses, a farm,
  * a woodcutter and a well, plus one archer squad on the wall and one spear squad behind the gate per player.
  */
 export function starterBase(s: GameState) {
@@ -37,16 +37,21 @@ export function starterBase(s: GameState) {
   const wy = k.cy - 16, rowY = (wy + 0.5) * CELL;
   const road = m.lanes[0].pts.reduce((a, b) => (Math.abs(b[1] - rowY) < Math.abs(a[1] - rowY) ? b : a));
   const gx = Math.floor(road[0] / CELL);
+  // a full curtain wall from rock face to rock face: walk out from the gate until the cliff stops it
+  const free = (x: number) => x >= 0 && x < t.cw && !siteProblem(s, 'wall', x, wy);
+  let x0 = gx, x1 = gx;
+  while (free(x0 - 1)) x0--;
+  while (free(x1 + 1)) x1++;
+  // bow towers: one at each end against the rock, more every ~11 cells along the curtain, none next to the gate
+  const towerAt = new Set<number>([x0 + 1, x1 - 1]);
+  for (let d = 11; gx - d > x0 + 4; d += 11) towerAt.add(gx - d);
+  for (let d = 11; gx + d < x1 - 4; d += 11) towerAt.add(gx + d);
   const wallIds: number[] = [];
-  for (let x = gx - 6; x <= gx + 6; x++) {
-    if (x === gx) continue;
-    const i = wy * t.cw + x;
-    if (x < 0 || x >= t.cw || !t.buildable(i) || siteProblem(s, 'wall', x, wy)) continue;
-    wallIds.push(newStructure(s, 'wall', x, wy, 0, true).id);
+  for (let x = x0; x <= x1; x++) {
+    if (x === gx) atLevel(s, newStructure(s, 'gate', x, wy, 0, true).id, 2);
+    else if (towerAt.has(x) && !siteProblem(s, 'tower_bow', x, wy)) newStructure(s, 'tower_bow', x, wy, 0, true);
+    else { const w = newStructure(s, 'wall', x, wy, 0, true); atLevel(s, w.id, 2); wallIds.push(w.id); }
   }
-  for (const id of wallIds) atLevel(s, id, 2);
-  if (!siteProblem(s, 'gate', gx, wy)) atLevel(s, newStructure(s, 'gate', gx, wy, 0, true).id, 2);
-  for (const x of [gx - 7, gx + 7]) if (!siteProblem(s, 'tower_bow', x, wy)) newStructure(s, 'tower_bow', x, wy, 0, true);
 
   // the town between wall and keep
   place(s, 'barracks', k.cx - 7, k.cy - 9);
