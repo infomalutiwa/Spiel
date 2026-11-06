@@ -8,6 +8,8 @@ import { StructureViews } from './render/structures';
 import { UnitViews } from './render/units';
 import { Effects } from './render/effects';
 import { castleLayout, unitLayout } from './gallery';
+import { loadWallKit } from './render/castlekit';
+void loadWallKit();
 import { Connection, interpolation } from './net/connection';
 import { Controls } from './input/controls';
 import { Hud, reasonText } from './ui/hud';

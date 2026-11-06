@@ -2,6 +2,74 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { DIRS, WALL_TOP, type StructId } from '@talwacht/shared';
 import { texSet, TRIPLANAR } from './textures';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+
+// ---------- Blender-built wall modules (tools/blender/castle_kit.py) ----------
+/** bumped when the Blender kit has loaded, so cached procedural walls get rebuilt */
+export let kitVersion = 0;
+const KIT_MODULES = new Map<string, THREE.BufferGeometry>();
+const MAT_ID: Record<string, number> = { stone: 0, stone_dark: 0, stone_top: 0, plinth: 0, stone3: 0, stone3_dark: 0, wood: 1, wood_dark: 1, plank: 1, iron: 3 };
+/** glTF meshes → one non-indexed geometry with colour = material colour × baked AO, plus the kit material id */
+function moduleGeometry(obj: THREE.Object3D): THREE.BufferGeometry {
+  const parts: THREE.BufferGeometry[] = [];
+  obj.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(obj.matrixWorld).invert();
+  obj.traverse(o => {
+    const m = o as THREE.Mesh;
+    if (!m.isMesh) return;
+    const g = m.geometry.clone().applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, m.matrixWorld)).toNonIndexed();
+    const mt = m.material as THREE.MeshStandardMaterial, n = g.attributes.position.count;
+    const base = mt.color.clone(), ao = g.attributes.color as THREE.BufferAttribute | undefined;
+    const col = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) {
+      const a = ao ? 0.35 + 0.65 * ao.getX(i) : 1;
+      col[i * 3] = base.r * a; col[i * 3 + 1] = base.g * a; col[i * 3 + 2] = base.b * a;
+    }
+    const out = new THREE.BufferGeometry();
+    out.setAttribute('position', g.attributes.position); out.setAttribute('normal', g.attributes.normal);
+    out.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    out.setAttribute('kmat', new THREE.BufferAttribute(new Float32Array(n).fill(MAT_ID[mt.name] ?? 3), 1));
+    parts.push(out);
+  });
+  return mergeGeometries(parts, false)!;
+}
+/** mirror across z (outer side flips) keeping triangles front-facing */
+function mirrorZ(g: THREE.BufferGeometry) {
+  const m = g.clone(); m.scale(1, 1, -1);
+  const p = m.attributes.position as THREE.BufferAttribute;
+  for (let i = 0; i < p.count; i += 3) for (const name of ['position', 'normal', 'color', 'kmat']) {
+    const a = m.attributes[name] as THREE.BufferAttribute, k = a.itemSize;
+    for (let c = 0; c < k; c++) { const t = a.array[(i + 1) * k + c]; (a.array as Float32Array)[(i + 1) * k + c] = a.array[(i + 2) * k + c]; (a.array as Float32Array)[(i + 2) * k + c] = t; }
+  }
+  return m;
+}
+export function loadWallKit(): Promise<void> {
+  return new GLTFLoader().loadAsync(`${import.meta.env.BASE_URL}assets/models/kit_walls.glb`).then(gltf => {
+    for (const o of gltf.scene.children) {
+      const g = moduleGeometry(o);
+      KIT_MODULES.set(o.name, g); KIT_MODULES.set(`${o.name}~m`, mirrorZ(g));
+    }
+    kitVersion++;
+  }).catch(e => console.warn('wall kit', e));
+}
+function kitWall(tier: number, mask: number, keepSide: number, damage: number): THREE.BufferGeometry | null {
+  const arm = KIT_MODULES.get(`arm${tier}${damage ? '_d' : ''}`);
+  if (!arm) return null;
+  const parts: THREE.BufferGeometry[] = [];
+  let links = 0, straight = false;
+  const dirs: [number, number][] = [];
+  for (let i = 0; i < 8; i++) if (mask & (1 << i)) { links++; dirs.push(DIRS[i] as [number, number]); }
+  if (dirs.length === 2 && dirs[0][0] === -dirs[1][0] && dirs[0][1] === -dirs[1][1]) straight = true;
+  const pier = KIT_MODULES.get(tier === 1 ? 'pier1' : `pier${tier}${straight || links === 0 ? '' : '_c'}`)!;
+  parts.push(pier.clone());
+  for (const [dx, dy] of dirs) {
+    const l = Math.hypot(dx, dy), s = outerSign(dx / l, dy / l, keepSide);
+    const g = (s > 0 ? KIT_MODULES.get(`arm${tier}${damage ? '_d' : ''}~m`)! : arm).clone();
+    g.applyMatrix4(new THREE.Matrix4().makeRotationY(-Math.atan2(dy, dx)).multiply(new THREE.Matrix4().makeScale(l, 1, 1)));
+    parts.push(g);
+  }
+  return mergeGeometries(parts, false);
+}
 
 /**
  * Procedural castle kit. Every rampart cell = centre pier + one half-arm per connected neighbour (see shared/autotile),
@@ -101,6 +169,8 @@ function outerSign(dx: number, dy: number, keepSide: number) {
  * damage 0 = whole, 1 = battered (merlons missing), 2 = breaking (more missing, cracks darker)
  */
 export function wallGeometry(tier: number, mask: number, keepSide: number, damage = 0, seedId = 1): THREE.BufferGeometry {
+  const fromKit = kitWall(tier, mask, keepSide, damage);
+  if (fromKit) return fromKit;
   seed = 1000 + tier * 97 + mask * 13 + damage * 7 + (seedId % 5);
   const top = WALL_TOP[tier - 1];
   const parts: THREE.BufferGeometry[] = [];

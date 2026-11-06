@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CELL, isWallish, K, STRUCTURES, wallMask, type StructId, type StructSnap, type Terrain } from '@talwacht/shared';
-import { gateParts, keepGeometry, kitMaterial, pitchGeometry, scaffoldGeometry, towerGeometry, towerPlatform, trapGeometry, wallGeometry } from './castlekit';
+import { kitVersion, gateParts, keepGeometry, kitMaterial, pitchGeometry, scaffoldGeometry, towerGeometry, towerPlatform, trapGeometry, wallGeometry } from './castlekit';
 import { modelInstance } from './assets';
 
 /** KayKit buildings for the town and economy (blue roofs to match the castle kit) */
@@ -60,7 +60,7 @@ export class StructureViews {
     const wallCells = [...structs.values()].filter(s => s.kind === 'wall');
     const masks = new Map<number, number>();
     for (const s of wallCells) masks.set(s.id, wallMask(isWall, isCliff, s.cx, s.cy));
-    const key = wallCells.map(s => `${s.id}:${s.level}:${masks.get(s.id)}:${damageOf(s)}:${Math.round(progressOf(s) * 10)}`).join('|');
+    const key = `${kitVersion}#` + wallCells.map(s => `${s.id}:${s.level}:${masks.get(s.id)}:${damageOf(s)}:${Math.round(progressOf(s) * 10)}`).join('|');
     if (key !== this.wallKey) { this.wallKey = key; this.rebuildWalls(wallCells, masks); }
 
     // ---- everything else: one object per structure ----
@@ -110,7 +110,7 @@ export class StructureViews {
     const m = new THREE.Matrix4();
     for (const [k, list] of groups) {
       const [lv, mask, side, dmg, sd] = k.split(':').map(Number);
-      const g = this.geo(`w:${k}`, () => wallGeometry(lv, mask, side, dmg, sd));
+      const g = this.geo(`w:${kitVersion}:${k}`, () => wallGeometry(lv, mask, side, dmg, sd));
       const im = new THREE.InstancedMesh(g, kitMaterial, list.length);
       list.forEach((s, i) => {
         const p = progressOf(s);
