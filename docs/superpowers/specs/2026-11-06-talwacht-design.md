@@ -108,6 +108,17 @@ Türme stehen **in** der Mauerlinie (dann verbinden sich die Wehrgänge) oder fr
 
 ---
 
+### Rollen der Türme (Pflicht: jeder Turm hat einen klaren Nutzen)
+| Turm | Feuerrate | Schaden/Treffer | Reichweite | Fläche | Bester Einsatz | Schwach gegen |
+|---|---|---|---|---|---|---|
+| Bogenturm | hoch (1 Schuss/0,9 s je Schütze) | niedrig, Stich | mittel | nein | Massen leichter Gegner, Pioniere | Schilde, schwere Rüstung |
+| Armbrustturm | langsam (1/2,2 s) | hoch (≈ 3× Bogen), panzerbrechend | mittel-weit | nein | Schwere, Bosse, Rammbock-Bediener | große Massen |
+| Ballista | sehr langsam (1/4 s) | sehr hoch, **durchschlägt bis zu 6 Ziele in Linie** und ignoriert Schilde | weit | Linie | Schildkröte von der Seite, Belagerungsturm, Kolonnen auf geraden Wegen | einzelne, verstreute Ziele |
+| Katapultturm | langsam (1/5 s), Steinmunition | hoch, **großer Flächenschaden (Radius 6 m)**, **bricht Formationen** (Schildkröte löst sich für 6 s auf) | sehr weit, Mindestabstand | ja | Schildkröte, dichte Gruppen, Trebuchets | schnelle Reiter, nahe Ziele |
+| Pechnase | kurz | Brand-Fläche direkt vor Tor/Mauer, ignoriert Schilde von oben | sehr kurz | ja | Rammbock + Schildkröte am Tor | alles, was nicht am Tor steht |
+
+Die Bot-Matrix (Abschnitt 15) prüft diese Rollen: Jeder Turm muss in seinem Szenario klar besser sein als die anderen, gleiche Kosten vorausgesetzt (z. B. Katapult gegen Schildkröte ≥ 3× so wirksam wie Bogenturm).
+
 ## 6. Fallen
 
 | Falle | Wirkung | Besonderheit |
@@ -191,7 +202,7 @@ Dazu: Halten / Verfolgen / Rückzug und Formationen (Linie, Block, Speerwall).
 **Spezialwellen (Abwechslung):**
 - **Nachtangriff:** wenig Sicht, Fackeln an Mauern und Brandpfeile werden wichtig.
 - **Sturmregen:** Feuer geht schlechter, Pech brennt nicht.
-- Grundregel: **Angriffe nur von vorn.** Optional, standardmäßig **aus**, gibt es die Einstellung „Kletterer“: selten kommt eine kleine, angekündigte Gruppe über die Klippe.
+- Grundregel: **Angriffe nur von vorn.** Keine Angriffe über Klippen oder von hinten.
 
 ---
 
