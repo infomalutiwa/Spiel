@@ -70,7 +70,7 @@ export function createGame(mapId: string, diff: Difficulty, seed: number, talent
     wave: 0, waveCount: d.waves, nextWaveAt: FIRST_WAVE_AT, plans: [], spawnQ: [],
     memory: { wallRangedShare: 0, traps: 0, gateHp: 0, riders: 0, moat: 0, fire: 0 }, bonusBudget: 0,
     keepId: 0, keepMinFrac: 1, kills: 0, dmgBy: {},
-    hunger: false, night: 0, rain: false, events: [], pings: [], previews: [null, null], result: null,
+    hunger: false, night: 0, rain: false, special: null, events: [], pings: [], previews: [null, null], result: null,
   };
   const k = cellOf(map.keep.x, map.keep.y);
   const keep = newStructure(s, 'keep', k.cx - 2, k.cy - 2, 0, true);

@@ -124,6 +124,8 @@ export interface GameState {
   keepId: number; keepMinFrac: number;
   kills: number; dmgBy: Record<string, number>;
   hunger: boolean; night: number; rain: boolean;
+  /** special conditions of the current wave */
+  special: 'night' | 'rain' | null;
   events: GameEvent[]; pings: Ping[]; previews: [Preview | null, Preview | null];
   result: GameResult | null;
   /** debug: total waves override (tests, ?debugWaves) */
