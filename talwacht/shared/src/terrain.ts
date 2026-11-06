@@ -23,7 +23,7 @@ export interface Terrain extends GridLike {
   slope(c: number): number;
 }
 
-const CLIFF_H = 42;
+const CLIFF_H = 64;
 
 export function buildTerrain(map: MapDef): Terrain {
   const ys = map.edges.map(e => e.y), ls = map.edges.map(e => e.left), rs = map.edges.map(e => e.right);
@@ -39,9 +39,10 @@ export function buildTerrain(map: MapDef): Terrain {
     if (out > -6) {
       const o = Math.max(0, out + 2);
       // terraced rock face: steep, with ledges and a ragged top
-      const face = Math.min(CLIFF_H, o * 2.6) + Math.sin(o * 0.35) * Math.min(3, o * 0.2);
-      h += face * smooth(-6, 6, out) + (fbm(x * 0.06, y * 0.06, map.seed + 5) - 0.5) * Math.min(10, o * 0.5);
-      if (o > 16) h += (fbm(x * 0.012, y * 0.012, map.seed + 9) - 0.3) * 18; // rolling ridge tops
+      const face = Math.min(CLIFF_H, o * 3.4);
+      h += face * smooth(-6, 6, out) + (fbm(x * 0.07, y * 0.07, map.seed + 5) - 0.5) * Math.min(14, o * 0.7)
+        + (noise2(x * 0.22, y * 0.22, map.seed + 6) - 0.5) * Math.min(3.5, o * 0.4); // craggy rock face
+      if (o > 16) h += (fbm(x * 0.012, y * 0.012, map.seed + 9) - 0.3) * 22 * smooth(16, 40, o); // rolling ridge tops
     }
     if (map.creek) {
       const c = polyDist(x, y, map.creek).d;
