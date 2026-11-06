@@ -79,7 +79,7 @@ export const STRUCTURES: Record<StructId, StructDef> = {
   tower_catapult: S({ id: 'tower_catapult', name: 'Katapultturm', icon: '🪨', cat: 'tower', blurb: 'Großer Flächenschaden, sprengt Schildkröten auf. Braucht Stein.', w: 1, h: 1, hp: [900, 1200], cost: res(120, 120, 0, 60), up: [res(80, 80, 0, 80)], build: 30,
     tower: { shooters: [1, 1], cd: [5, 5], dmg: [70, 85], range: [85, 110], minRange: 30, radius: 6, edge: 0.4, breakFormation: 6, stone: 3, kind: 'stone', ignoresShields: true, burn: [[0, 0], [8, 5]], prefers: 'cluster' } }),
   pitch: S({ id: 'pitch', name: 'Pechnase', icon: '🫕', cat: 'tower', blurb: 'Gießt brennendes Pech vor Tor oder Mauer – der Konter gegen die Schildkröte.', w: 1, h: 1, hp: [500, 700], cost: res(40, 40, 0, 30), up: [res(30, 30, 0, 40)], build: 14,
-    tower: { shooters: [1, 1], cd: [8, 8], dmg: [60, 90], range: [7, 7], box: [8, 6], kind: 'fire', ignoresShields: true, burn: [[10, 4], [15, 4]], prefers: 'any' } }),
+    tower: { shooters: [1, 1], cd: [6, 6], dmg: [60, 90], range: [7, 7], box: [8, 6], kind: 'fire', ignoresShields: true, burn: [[10, 4], [15, 4]], prefers: 'any' } }),
   watchtower: S({ id: 'watchtower', name: 'Wachturm', icon: '🔭', cat: 'tower', blurb: 'Genauer Spähbericht, Moral in der Nähe, hebt die Nacht auf.', w: 1, h: 1, hp: [500], cost: res(50, 20), up: [], build: 14, wooden: [true] }),
 
   spikes: S({ id: 'spikes', name: 'Stachelgrube', icon: '🔺', cat: 'trap', blurb: 'Schaden und Verlangsamung, 12 Auslösungen.', w: 1, h: 1, hp: [200], cost: res(15), up: [], build: 5,

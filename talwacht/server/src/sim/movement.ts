@@ -51,6 +51,7 @@ function moveEnemy(s: GameState, u: Unit, dt: number) {
   if (f.dist[c] === 0 || f.next[c] < 0) { u.target = STRUCT_TARGET + s.keepId; return; }
   const n = f.next[c];
   const st = occ[n] ? structById(s, occ[n]) : undefined;
+  if (st?.kind === 'moat' && (u.type === 'siege_tower' || u.type === 'miner')) { u.vx = u.vy = 0; u.anim = 0; return; }
   if (blocks(st) && !(st!.kind === 'gate' && st!.state === 1)) {
     if (u.target === 0 || u.target >= STRUCT_TARGET) u.target = STRUCT_TARGET + st!.id;
     const r = defOf(u.type).range + defOf(u.type).radius * 0.5;
@@ -99,7 +100,7 @@ export function tickMovement(s: GameState, dt: number) {
     if (u.hp <= 0) continue;
     if (u.slowT > 0) { u.slowT -= dt; if (u.slowT <= 0) u.slow = 0; }
     if (u.stun > 0) { u.stun -= dt; u.vx = u.vy = 0; continue; }
-    if (u.mode >= CONTROLLED || u.formation) continue;
+    if (u.mode >= CONTROLLED || u.formation || (u.side === 'e' && u.z > 0)) continue;
     if (u.anim === 2) { u.vx = u.vy = 0; continue; } // fighting this tick
     if (u.side === 'e') moveEnemy(s, u, dt); else movePlayer(s, u, dt);
   }

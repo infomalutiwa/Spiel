@@ -9,7 +9,7 @@ import { CONTROLLED, distToStruct } from './movement';
 
 export interface HitOpts {
   attacker?: Unit; x?: number; y?: number; z?: number;
-  ranged?: boolean; pierce?: number; ignoresShields?: boolean; stat?: string; side?: Side;
+  ranged?: boolean; pierce?: number; ignoresShields?: boolean; stat?: string; side?: Side; kind?: DmgKind;
 }
 /** hooks other systems plug in (testudo shields from siege.ts) */
 export const hooks = {
@@ -57,7 +57,7 @@ export function damage(s: GameState, t: Unit, amount: number, kind: DmgKind, o: 
     if (td.pavise && Math.hypot(t.vx, t.vy) < 0.2 && fromFront(t, sx, sy)) dmg *= 1 - td.pavise;
     if (t.side === 'p' && t.z === 0 && s.research.includes('pavise') && isTroop(t.type) && TROOPS[t.type].role === 'ranged') dmg *= 0.7;
   }
-  if (!o.ignoresShields) dmg *= hooks.shield(s, t, { ...o, x: sx, y: sy, ranged });
+  if (!o.ignoresShields || kind === 'fire') dmg *= hooks.shield(s, t, { ...o, x: sx, y: sy, ranged, kind });
   if (t.side === 'p' && s.hunger) dmg *= 1.1;
   dmg = Math.max(0, dmg);
   t.hp -= dmg;
@@ -171,7 +171,7 @@ function pick(s: GameState, u: Unit, r: number): Unit | undefined {
     let sc = d;
     if (ranged) sc = crossbow ? -armorOf(s, o) * 10 + d * 0.1 : o.hp + d * 0.5;
     if (u.type === 'spearman' && isMounted(o)) sc -= 50;
-    if (u.side === 'e' && o.z > 0 && !ranged) continue;
+    if (u.side === 'e' && o.z > 0 && u.z === 0 && !ranged) continue;
     if (sc < score) { score = sc; best = o; }
   }
   return best;
