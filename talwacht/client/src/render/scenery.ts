@@ -27,7 +27,7 @@ export class Instancer {
       if (/leaf/i.test(mat.name)) { mat.color.set('#3f7a35').lerp(mat.color, 0.25).multiplyScalar(this.shadow ? 0.95 : 0.8); mat.envMapIntensity = 0.35; }
       if (/wood|bark/i.test(mat.name)) mat.color.set('#6b4a32');
       if (this.tint && /leaf|grass/i.test(mat.name)) mat.color.multiply(this.tint);
-      if (this.rock && /dirt|stone/i.test(mat.name)) mat.color.set(this.rock);
+      if (this.rock && !/grass|leaf/i.test(mat.name)) mat.color.set(this.rock);
       if (this.rock && /grass/i.test(mat.name)) mat.color.set('#557f36');
       const local = base.clone().multiply(mesh.matrixWorld);
       const im = new THREE.InstancedMesh(mesh.geometry, mat, this.items.length);
@@ -53,15 +53,27 @@ export async function buildScenery(t: Terrain, parent: THREE.Object3D) {
     : [new Instancer(group, 'tree_pineTallA', 13, shadow), new Instancer(group, 'tree_pineRoundC', 10, shadow), new Instancer(group, 'tree_oak', 10, shadow), new Instancer(group, 'tree_default', 9, shadow), new Instancer(group, 'tree_fat', 9, shadow, m.theme === 'gorge' ? autumn : undefined)];
   const trees = treeSet(true), farTrees = treeSet(false);
   const grey = snow ? '#8d96a3' : '#8b847a';
-  // photo-scanned Poly Haven boulder (decimated in Blender, tools/blender/decimate.py) in a few sizes
-  const rocks = [new Instancer(group, 'ph_boulder', 2.2), new Instancer(group, 'ph_boulder', 3.2), new Instancer(group, 'ph_boulder', 1.5)];
+  // low-poly boulders in light grey (matches the stylised look)
+  const stone = snow ? '#9aa3ae' : '#a9a7a1';
+  const rocks = [new Instancer(group, 'rock_largeA', 2.4, true, undefined, stone), new Instancer(group, 'rock_largeC', 3.2, true, undefined, stone), new Instancer(group, 'rock_smallA', 1.4, true, undefined, stone)];
   void grey;
+  // Quaternius copses (whole tree groups) for woods, and faceted snow-capped peaks on the far ridges
+  const copses = snow ? [new Instancer(group, 'rts/pines', 12)] : [new Instancer(group, 'rts/trees', 11), new Instancer(group, 'rts/pines', 12)];
+  const peaks = [new Instancer(group, 'rts/mountains_a', 70, false), new Instancer(group, 'rts/mountains_b', 60, false), new Instancer(group, 'rts/mountain', 75, false)];
   const bushes = snow ? [] : [new Instancer(group, 'plant_bushLarge', 2.2, false), new Instancer(group, 'plant_bush', 1.6, false)];
   const flowers = snow ? [] : [new Instancer(group, 'flower_yellowA', 0.9, false), new Instancer(group, 'flower_redA', 0.9, false), new Instancer(group, 'flower_purpleA', 0.9, false)];
   const pick = <T,>(a: T[]) => a[Math.floor(R() * a.length)];
   const x0 = EXTENT.x0, x1 = m.w + EXTENT.x1, y0 = EXTENT.y0, y1 = m.d + EXTENT.y1;
   const nearRoad = (x: number, y: number, r: number) => m.lanes.some(l => polyDist(x, y, y < 0 ? [[l.pts[0][0], -400], ...l.pts] : l.pts).d < r);
   const nearCreek = (x: number, y: number, r: number) => !!m.creek && polyDist(x, y, m.creek).d < r;
+  // peaks: a loose chain along both outer ridges and behind the keep
+  for (let y = y0 + 40; y < y1; y += 70 + R() * 50) for (const side of [0, 1]) {
+    const e = m.edges.reduce((a, b) => (Math.abs(b.y - y) < Math.abs(a.y - y) ? b : a));
+    const x = side ? Math.max(e.right + 150, m.w + 40) + R() * 60 : Math.min(e.left - 150, -40) - R() * 60;
+    if (x < x0 - 40 || x > x1 + 40) continue;
+    pick(peaks).add(x, t.height(x, y) - 4, y, R() * 6.28, 0.8 + R() * 0.6);
+  }
+  for (let x = x0 + 30; x < x1; x += 90 + R() * 60) pick(peaks).add(x, t.height(x, y1 - 30) - 4, y1 - 30 + R() * 40, R() * 6.28, 0.9 + R() * 0.5);
   const density = LOW ? 0.45 : 1;
   const N = Math.round(((x1 - x0) * (y1 - y0)) / 34 * density);
   for (let i = 0; i < N; i++) {
@@ -75,7 +87,8 @@ export async function buildScenery(t: Terrain, parent: THREE.Object3D) {
       if (out > 95) continue; // beyond this the ridge reads as canopy colour in the terrain
       const flat = h > 48;
       const clump = fbm(x * 0.02, y * 0.02, m.seed + 77); // woods with glades
-      if ((flat && R() < (out < 40 ? 0.22 : 0.06) + clump * 0.32) || (!flat && R() < 0.03)) pick(out < 30 ? trees : farTrees).add(x, h - 0.3, y, R() * 6.28, 0.8 + R() * 0.7);
+      if (flat && R() < 0.012 + clump * 0.03) { pick(copses).add(x, h - 0.5, y, R() * 6.28, 0.8 + R() * 0.5); continue; }
+      if ((flat && R() < (out < 40 ? 0.14 : 0.03) + clump * 0.2) || (!flat && R() < 0.03)) pick(out < 30 ? trees : farTrees).add(x, h - 0.3, y, R() * 6.28, 0.8 + R() * 0.7);
       else if (out < 14 && R() < 0.06) pick(rocks).add(x, h - 0.6, y, R() * 6.28, 0.7 + R() * 1.0);
       continue;
     }
@@ -85,7 +98,7 @@ export async function buildScenery(t: Terrain, parent: THREE.Object3D) {
       else if (bushes.length && R() < 0.05) pick(bushes).add(x, h, y, R() * 6.28, 0.8 + R() * 0.6);
       continue;
     }
-    if (kind === K.forest) { if (R() < 0.55) pick(trees).add(x, h - 0.3, y, R() * 6.28, 0.7 + R() * 0.5); continue; }
+    if (kind === K.forest) { if (R() < 0.05) { pick(copses).add(x, h - 0.4, y, R() * 6.28, 0.6 + R() * 0.3); continue; } if (R() < 0.45) pick(trees).add(x, h - 0.3, y, R() * 6.28, 0.7 + R() * 0.5); continue; }
     if (kind === K.rock) { if (R() < 0.3) pick(rocks).add(x, h - 0.4, y, R() * 6.28, 0.5 + R() * 0.8); continue; }
     if (!inMap && y < 0) { // the approach outside the map: open fields with copses
       if (R() < 0.035) pick(trees).add(x, h - 0.3, y, R() * 6.28, 0.7 + R() * 0.5);
@@ -96,7 +109,7 @@ export async function buildScenery(t: Terrain, parent: THREE.Object3D) {
     if (R() < 0.012) pick(trees).add(x, h - 0.3, y, R() * 6.28, 0.6 + R() * 0.4);
     else if (bushes.length && R() < 0.02) pick(bushes).add(x, h, y, R() * 6.28, 0.7 + R() * 0.6);
   }
-  await Promise.all([...trees, ...farTrees, ...rocks, ...bushes, ...flowers].map(i => i.build()));
+  await Promise.all([...trees, ...farTrees, ...rocks, ...bushes, ...flowers, ...copses, ...peaks].map(i => i.build()));
   buildBridges(t, group);
   return group;
 }

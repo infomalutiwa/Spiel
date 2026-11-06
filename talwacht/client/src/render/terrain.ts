@@ -1,14 +1,14 @@
 import * as THREE from 'three';
 import { fbm, K, polyDist, smooth, type MapDef, type Terrain } from '@talwacht/shared';
 import { LOW } from './scene';
-import { texSet, TRIPLANAR } from './textures';
 
 interface Palette { g1: string; g2: string; meadow: string; road: string; road2: string; forest: string; rock: string; rock2: string; top: string; shore: string; water: string }
+// bright, clean low-poly palette (matches the Quaternius RTS buildings): saturated meadows, light grey rock, turquoise water
 const PAL: Record<MapDef['theme'], Palette> = {
-  green: { g1: '#6f9f45', g2: '#8fb553', meadow: '#a9c65c', road: '#c4ab80', road2: '#a99070', forest: '#5d8a3a', rock: '#7c766d', rock2: '#9d958a', top: '#6d9a42', shore: '#c9b98a', water: '#3f8fbf' },
-  gorge: { g1: '#7aa24a', g2: '#98b958', meadow: '#b0c862', road: '#c0a47c', road2: '#a68c6c', forest: '#5a8238', rock: '#85776a', rock2: '#a5968a', top: '#6a8f40', shore: '#c4b28a', water: '#3d88b6' },
-  river: { g1: '#6a9f44', g2: '#8cb655', meadow: '#a8c860', road: '#c4ab80', road2: '#a99070', forest: '#57873a', rock: '#7a756e', rock2: '#9c968c', top: '#689a42', shore: '#cdbd8e', water: '#3a92c4' },
-  snow: { g1: '#c9d3dc', g2: '#bcc8d3', meadow: '#c4cfd9', road: '#c8b9a6', road2: '#ad9c88', forest: '#aebdc9', rock: '#6f7884', rock2: '#8b95a1', top: '#cdd6df', shore: '#b6c3cf', water: '#5b9fcb' },
+  green: { g1: '#5f9f33', g2: '#6eac3b', meadow: '#7fba45', road: '#d9bb83', road2: '#c9a66e', forest: '#5c9a33', rock: '#9c9a94', rock2: '#bdbbb4', top: '#5f9e35', shore: '#e6d59e', water: '#3fb0e8' },
+  gorge: { g1: '#65a236', g2: '#76b040', meadow: '#88bd4b', road: '#d5b47c', road2: '#c19e68', forest: '#5b9433', rock: '#a39a8e', rock2: '#c2b9ad', top: '#62a038', shore: '#e2d09a', water: '#3caae2' },
+  river: { g1: '#5c9e33', g2: '#6bab3b', meadow: '#7cb945', road: '#d9bb83', road2: '#c9a66e', forest: '#589a33', rock: '#9a9994', rock2: '#bcbab4', top: '#5c9c35', shore: '#e8d8a2', water: '#3db3ec' },
+  snow: { g1: '#e4ecf2', g2: '#d6e1ea', meadow: '#dfe8ef', road: '#cdbba2', road2: '#b9a68c', forest: '#7fa08a', rock: '#8e949c', rock2: '#aab0b8', top: '#eef3f7', shore: '#c7d6e2', water: '#58b6e8' },
 };
 
 /** visible extent: the playable map plus scenery margins (approach in front, ridges at the sides and back) */
@@ -58,9 +58,11 @@ export function buildTerrainMesh(t: Terrain): THREE.Mesh {
       c.lerp(a, rockK); wk = Math.max(wk, rockK);
       const topK = smooth(40, 52, h) * smooth(8, 18, out);
       if (topK > 0) { c.lerp(b.set(P.top).lerp(a.set(P.g1), n), topK * (0.75 + n2 * 0.25)); wk *= 1 - topK * 0.85; }
+      const snowK = m.theme === 'snow' ? smooth(48, 62, h + n2 * 6) : smooth(80, 95, h + n2 * 6);
+      if (snowK > 0) { c.lerp(b.set('#f4f7fa'), snowK); wk = Math.max(0, wk - snowK); }
       // distant ridges: dark forest canopy instead of thousands of trees
-      const canopy = smooth(8, 34, out) * (0.65 + 0.35 * fbm(x * 0.03, y * 0.03, m.seed + 77));
-      if (canopy > 0) { c.lerp(b.set(P.forest).multiplyScalar(0.62 + n2 * 0.22), canopy); wf = Math.max(wf, canopy * (1 - wk)); }
+      const canopy = smooth(8, 34, out) * smooth(50, 38, h) * (0.65 + 0.35 * fbm(x * 0.03, y * 0.03, m.seed + 77));
+      if (canopy > 0) { c.lerp(b.set(P.forest).multiplyScalar(0.8 + n2 * 0.2), canopy); wf = Math.max(wf, canopy * (1 - wk)); }
     }
     // splat weights (grass gets the rest) and a tint = painted colour relative to the layers' own colour
     wk = Math.min(1, wk); wr = Math.min(1 - wk, wr); wf = Math.min(1 - wk - wr, wf);
@@ -86,45 +88,9 @@ export function buildTerrainMesh(t: Terrain): THREE.Mesh {
   return mesh;
 }
 
-/** photo-textured ground: grass / road / rock (triplanar) / forest floor blended by the splat weights */
-function terrainMaterial(theme: MapDef['theme']) {
-  const snow = theme === 'snow';
-  const T = {
-    grass: texSet(snow ? 'snow_02' : 'leafy_grass'), road: texSet('dirt_floor'), rock: texSet(theme === 'gorge' ? 'mossy_rock' : 'rock_face_03'),
-    forest: texSet(snow ? 'snow_02' : 'forest_ground_04'),
-  };
-  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0 });
-  mat.onBeforeCompile = sh => {
-    Object.assign(sh.uniforms, {
-      tGrass: { value: T.grass.map }, tRoad: { value: T.road.map }, tRock: { value: T.rock.map }, tForest: { value: T.forest.map },
-      tGrassN: { value: T.grass.normal }, tRoadN: { value: T.road.normal }, snowTheme: { value: snow },
-    });
-    sh.vertexShader = sh.vertexShader
-      .replace('#include <common>', '#include <common>\nattribute vec4 splat; varying vec4 vSplat; varying vec3 vWP; varying vec3 vWN;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSplat = splat; vWP = (modelMatrix * vec4(position, 1.0)).xyz; vWN = normalize(mat3(modelMatrix) * normal);');
-    sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', `#include <common>
-uniform sampler2D tGrass, tRoad, tRock, tForest, tGrassN, tRoadN; uniform bool snowTheme; varying vec4 vSplat; varying vec3 vWP; varying vec3 vWN;
-${TRIPLANAR}`)
-      .replace('#include <map_fragment>', `
-vec3 wn = normalize(vWN);
-// photo textures as luminance detail on top of the painted colour (keeps the art direction, adds real surface)
-#define DET(t, c) (c / max(textureLod(t, vec2(0.5), 12.0).rgb, vec3(0.04)))
-vec3 grass = mix(DET(tGrass, texture2D(tGrass, vWP.xz * 0.11).rgb), DET(tGrass, texture2D(tGrass, vWP.xz * 0.027 + 0.37).rgb), 0.4);
-vec3 road = DET(tRoad, texture2D(tRoad, vWP.xz * 0.16).rgb);
-vec3 forest = DET(tForest, texture2D(tForest, vWP.xz * 0.09).rgb);
-vec3 rock = DET(tRock, triSample(tRock, vWP, wn, 0.06).rgb);
-vec4 w = vSplat / max(0.001, vSplat.x + vSplat.y + vSplat.z + vSplat.w);
-vec3 det = grass * w.x + road * w.y + rock * w.z + forest * w.w;
-det = mix(vec3(dot(det, vec3(0.333))), det, 0.35); // mostly brightness, a little hue
-diffuseColor.rgb *= clamp(det, 0.35, snowTheme ? 1.15 : 1.8);`)
-      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
-{ vec3 gn = texture2D(tGrassN, vWP.xz * 0.11).xyz * 2.0 - 1.0; vec3 rn = texture2D(tRoadN, vWP.xz * 0.16).xyz * 2.0 - 1.0;
-  vec3 tn = mix(gn, rn, w.y) * (1.0 - w.z);
-  vec3 pw = normalize(wn + vec3(tn.x, 0.0, -tn.y) * 0.55);
-  normal = normalize((viewMatrix * vec4(pw, 0.0)).xyz); }`);
-  };
-  return mat;
+/** stylised ground: painted vertex colours on flat-shaded facets (low-poly look, cheap on phones) */
+function terrainMaterial(_theme: MapDef['theme']) {
+  return new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0, flatShading: true });
 }
 
 /** creek ribbon following the bed; a gentle flowing shimmer in the shader */
@@ -156,7 +122,7 @@ export function buildWater(t: Terrain): THREE.Mesh | null {
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   g.setIndex(idx); g.computeVertexNormals();
   // physically based water: dark deep middle, lighter shallows, foam at the banks, flowing ripples that reflect the sky
-  const mat = new THREE.MeshPhysicalMaterial({ color: PAL[m.theme].water, roughness: 0.06, metalness: 0, transparent: true, opacity: 0.9, clearcoat: 0.6, clearcoatRoughness: 0.08, envMapIntensity: 1.3 });
+  const mat = new THREE.MeshPhysicalMaterial({ color: PAL[m.theme].water, roughness: 0.18, metalness: 0, transparent: true, opacity: 0.92, clearcoat: 0.4, clearcoatRoughness: 0.15, envMapIntensity: 0.8 });
   mat.onBeforeCompile = sh => {
     sh.uniforms.time = { value: 0 };
     (mat.userData as { shader?: unknown }).shader = sh;
@@ -167,7 +133,7 @@ uniform float time; varying vec2 vUv2;
 float wv(vec2 p) { return sin(p.x * 1.7 + p.y * 0.9) * 0.5 + sin(p.x * -1.1 + p.y * 2.3 + 1.3) * 0.35 + sin(p.x * 3.1 - p.y * 1.4 + 2.1) * 0.15; }`)
       .replace('#include <color_fragment>', `#include <color_fragment>
 float edge = abs(vUv2.x - 0.5) * 2.0;
-diffuseColor.rgb = mix(diffuseColor.rgb * 0.55, diffuseColor.rgb * 1.25 + vec3(0.06, 0.08, 0.05), smoothstep(0.2, 0.95, edge));
+diffuseColor.rgb = mix(diffuseColor.rgb * 0.82, diffuseColor.rgb * 1.18 + vec3(0.08, 0.1, 0.08), smoothstep(0.3, 0.95, edge));
 float foam = smoothstep(0.82, 1.0, edge) * (0.55 + 0.45 * sin(vUv2.y * 40.0 - time * 3.0 + vUv2.x * 9.0));
 diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.92, 0.95, 0.95), foam * 0.55);
 diffuseColor.a *= mix(0.95, 0.55, smoothstep(0.7, 1.0, edge));`)

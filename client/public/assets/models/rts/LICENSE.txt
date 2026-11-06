@@ -1,0 +1,2 @@
+Ultimate Fantasy RTS pack by Quaternius (https://quaternius.com) - CC0 1.0 Universal (public domain).
+Converted to GLB with tools/blender/rts_import.py.

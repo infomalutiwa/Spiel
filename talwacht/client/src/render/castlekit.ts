@@ -9,6 +9,11 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 export let kitVersion = 0;
 const KIT_MODULES = new Map<string, THREE.BufferGeometry>();
 const MAT_ID: Record<string, number> = { stone: 0, stone_dark: 0, stone_top: 0, plinth: 0, stone3: 0, stone3_dark: 0, wood: 1, wood_dark: 1, plank: 1, iron: 3, roof: 2, roof_dark: 2, cloth: 3, gold: 3, glass: 3 };
+/** stylised palette for the kit (light stone, red roofs, warm wood: matches the Quaternius RTS buildings) */
+const STYLE: Record<string, string> = {
+  stone: '#c9c6be', stone_dark: '#a5a29a', stone_top: '#d8d5cd', plinth: '#9e9b93', stone3: '#d3d0c9', stone3_dark: '#aeaba3',
+  wood: '#9c6a3a', wood_dark: '#704a28', plank: '#ab7a48', roof: '#c9573f', roof_dark: '#a8442f', iron: '#5a5c60', cloth: '#c63c3c', gold: '#e2b444',
+};
 /** a Blender module by name (null until the kit has loaded) */
 export const kitModule = (name: string) => KIT_MODULES.get(name) ?? null;
 /** glTF meshes → one non-indexed geometry with colour = material colour × baked AO, plus the kit material id */
@@ -21,7 +26,7 @@ function moduleGeometry(obj: THREE.Object3D): THREE.BufferGeometry {
     if (!m.isMesh) return;
     const g = m.geometry.clone().applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, m.matrixWorld)).toNonIndexed();
     const mt = m.material as THREE.MeshStandardMaterial, n = g.attributes.position.count;
-    const base = mt.color.clone(), ao = g.attributes.color as THREE.BufferAttribute | undefined;
+    const base = (STYLE[mt.name] ? new THREE.Color(STYLE[mt.name]) : mt.color.clone()), ao = g.attributes.color as THREE.BufferAttribute | undefined;
     const col = new Float32Array(n * 3);
     for (let i = 0; i < n; i++) {
       const a = ao ? 0.35 + 0.65 * ao.getX(i) : 1;
@@ -151,8 +156,8 @@ ${TRIPLANAR}`)
   if (m < 0.5) t = triSample(tStone, vKP, n, 0.42).rgb / max(textureLod(tStone, vec2(0.5), 12.0).rgb, vec3(0.05));
   else if (m < 1.5) t = triSample(tWood, vKP, n, 0.35).rgb / max(textureLod(tWood, vec2(0.5), 12.0).rgb, vec3(0.05));
   else if (m < 2.5) t = triSample(tRoof, vKP, n, 0.45).rgb / max(textureLod(tRoof, vec2(0.5), 12.0).rgb, vec3(0.05));
-  t = mix(vec3(dot(t, vec3(0.333))), t, 0.4);
-  diffuseColor.rgb *= clamp(t, 0.3, 1.9);
+  t = mix(vec3(1.0), vec3(dot(t, vec3(0.333))), 0.3); // a hint of masonry, mostly clean flat colour
+  diffuseColor.rgb *= clamp(t, 0.6, 1.4);
 }`);
   };
 }

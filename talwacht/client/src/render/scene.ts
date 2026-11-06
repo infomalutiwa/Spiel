@@ -9,9 +9,9 @@ const MOBILE = matchMedia('(pointer: coarse)').matches;
 
 export interface Look { sky: string; horizon: string; fog: string; sun: string; sunI: number; hemiSky: string; hemiGround: string; exposure: number }
 export const LOOKS: Record<MapDef['theme'], Look> = {
-  green: { sky: '#6fa8d8', horizon: '#f2dcb6', fog: '#d9dcc4', sun: '#ffe2b0', sunI: 2.7, hemiSky: '#fff1d6', hemiGround: '#5a7a3a', exposure: 0.98 },
-  gorge: { sky: '#6c9fcc', horizon: '#ecd5b0', fog: '#d4d0bc', sun: '#ffdcaa', sunI: 2.6, hemiSky: '#f6ecd6', hemiGround: '#5c6c3c', exposure: 1.04 },
-  river: { sky: '#72acd9', horizon: '#f0dfbe', fog: '#d6dfcc', sun: '#ffe4b6', sunI: 2.6, hemiSky: '#fff3dc', hemiGround: '#557a40', exposure: 1.05 },
+  green: { sky: '#6fa8d8', horizon: '#f2dcb6', fog: '#cfe2ee', sun: '#ffe2b0', sunI: 2.7, hemiSky: '#fff1d6', hemiGround: '#5a7a3a', exposure: 0.86 },
+  gorge: { sky: '#6c9fcc', horizon: '#ecd5b0', fog: '#cde0ec', sun: '#ffdcaa', sunI: 2.6, hemiSky: '#f6ecd6', hemiGround: '#5c6c3c', exposure: 0.92 },
+  river: { sky: '#72acd9', horizon: '#f0dfbe', fog: '#d0e3ef', sun: '#ffe4b6', sunI: 2.6, hemiSky: '#fff3dc', hemiGround: '#557a40', exposure: 0.9 },
   snow: { sky: '#86b2dc', horizon: '#e6eef6', fog: '#dfe7ef', sun: '#fff0d8', sunI: 2.2, hemiSky: '#eef3fa', hemiGround: '#7c8898', exposure: 0.82 },
 };
 
@@ -98,7 +98,7 @@ export class World {
     const floor = this.heightAt(this.camera.position.x, this.camera.position.z) + 6; // never inside a cliff
     if (this.camera.position.y < floor) this.camera.position.y = floor;
     this.camera.lookAt(this.target);
-    const fogNear = this.dist * 1.25 + 120;
+    const fogNear = this.dist * 1.8 + 260; // clear air, only the far horizon fades
     const f = this.scene.fog as THREE.Fog; f.near = fogNear; f.far = fogNear + 900 + this.dist;
     // shadows: a box around the target sized by zoom
     const box = clamp(this.dist * 0.9, 60, 340);

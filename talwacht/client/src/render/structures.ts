@@ -3,14 +3,17 @@ import { CELL, isWallish, K, STRUCTURES, wallMask, type StructId, type StructSna
 import { kitVersion, gateParts, keepGeometry, kitMaterial, pitchGeometry, scaffoldGeometry, towerGeometry, towerPlatform, trapGeometry, wallGeometry } from './castlekit';
 import { modelInstance } from './assets';
 
-/** KayKit buildings for the town and economy (blue roofs to match the castle kit) */
+/** Quaternius 'Ultimate Fantasy RTS' buildings (CC0, converted by tools/blender/rts_import.py) */
 const BUILDING_MODEL: Partial<Record<StructId, string>> = {
-  lumber: 'hex/building_lumbermill_blue', quarry: 'hex/building_mine_green', mine: 'hex/building_mine_blue', farm: 'hex/building_grain',
-  mill: 'hex/building_windmill_blue', market: 'hex/building_market_blue', house: 'hex/building_home_A_blue', well: 'hex/building_well_blue',
-  barracks: 'hex/building_barracks_blue', range: 'hex/building_archeryrange_blue', stable: 'hex/building_tavern_blue', infirmary: 'hex/building_church_blue',
-  workshop: 'hex/building_blacksmith_green', smithy: 'hex/building_blacksmith_blue',
+  lumber: 'rts/lumber', quarry: 'rts/quarry', mine: 'rts/mine', farm: 'rts/farm',
+  mill: 'rts/mill', market: 'rts/market', house: 'rts/house_a', well: 'hex/building_well_blue',
+  barracks: 'rts/barracks', range: 'rts/range', stable: 'rts/stable', infirmary: 'rts/infirmary',
+  workshop: 'rts/workshop', smithy: 'rts/smithy',
 };
-const HOUSE_ALT = 'hex/building_home_B_blue';
+const RTS_TOWER: Partial<Record<StructId, (level: number) => string>> = {
+  tower_bow: l => `rts/tower${Math.min(3, l)}`, tower_xbow: l => `rts/tower${Math.min(3, l + 1)}`, watchtower: () => 'rts/watch',
+};
+const HOUSES = ['rts/house_a', 'rts/house_b', 'rts/house_c'];
 
 const damageOf = (s: StructSnap) => (s.hp / s.maxHp > 0.6 ? 0 : s.hp / s.maxHp > 0.3 ? 1 : 2);
 const progressOf = (s: StructSnap) => {
@@ -136,12 +139,25 @@ export class StructureViews {
     const alongX = !!(mask & (4 | 64)) || !(mask & (1 | 16));
     const faceOut = alongX ? 0 : (keepSide > 0 ? -Math.PI / 2 : Math.PI / 2);
 
-    if (s.kind === 'keep') root.add(mesh(this.geo(`keep:${kitVersion}:${s.level}`, () => keepGeometry(s.level))));
+    if (s.kind === 'keep') {
+      // Quaternius stone castle (three tiers); the Blender keep stays as fallback until it has loaded
+      const fb = mesh(this.geo(`keep:${kitVersion}:${s.level}`, () => keepGeometry(s.level))); root.add(fb);
+      void modelInstance(`rts/keep${Math.min(3, s.level)}`, s.w * CELL * 1.05).then(o => { if (o) { root.remove(fb); root.add(o); } });
+    }
     else if (s.kind === 'gate') {
       const parts = gateParts(s.level, alongX);
       root.add(mesh(parts.frame));
       const door = mesh(parts.door); root.add(door); view.door = door;
       if (parts.portcullis) { const p = mesh(parts.portcullis); root.add(p); view.port = p; }
+    } else if (RTS_TOWER[s.kind]) { // stone watch towers from the RTS pack; archers stand on the top platform
+      const file = RTS_TOWER[s.kind]!(s.level), n = STRUCTURES[s.kind].tower?.shooters[Math.min(s.level, STRUCTURES[s.kind].tower!.shooters.length) - 1] ?? 0;
+      void modelInstance(file, 4.6).then(o => {
+        if (!o) return;
+        if (dmg) o.traverse(c => { const mm = (c as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined; if (mm?.color) mm.color.multiplyScalar(dmg === 1 ? 0.8 : 0.6); });
+        root.add(o);
+        const h = new THREE.Box3().setFromObject(o).getSize(new THREE.Vector3()).y;
+        if (s.build <= 0 && n) this.garrison.set(s.id, { x: cx, y: cy, z: gh + h * (file.endsWith('1') ? 0.58 : 0.8), n, face: Math.PI });
+      });
     } else if (STRUCTURES[s.kind].cat === 'tower') {
       root.add(mesh(this.geo(`t:${kitVersion}:${s.kind}:${s.level}`, () => towerGeometry(s.kind, s.level))));
       const plat = towerPlatform(s.kind, s.level);
@@ -155,8 +171,8 @@ export class StructureViews {
       const tm = mesh(this.geo(`trap:${s.kind}:${spent}`, () => trapGeometry(s.kind, spent)));
       tm.castShadow = false; root.add(tm);
     } else if (BUILDING_MODEL[s.kind]) {
-      const file = s.kind === 'house' && s.id % 2 ? HOUSE_ALT : BUILDING_MODEL[s.kind]!;
-      const size = s.kind === 'well' ? 3.2 : s.w * CELL * (s.kind === 'mill' ? 0.8 : 0.92);
+      const file = s.kind === 'house' ? HOUSES[s.id % 3] : BUILDING_MODEL[s.kind]!;
+      const size = s.kind === 'well' ? 3.2 : s.w * CELL * (s.kind === 'house' ? 0.8 : s.kind === 'mill' ? 0.85 : 0.95);
       void modelInstance(file, size).then(o => {
         if (!o) return;
         o.rotation.y = ((s.id * 7) % 4) * Math.PI / 2;

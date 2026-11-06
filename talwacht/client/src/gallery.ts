@@ -25,6 +25,10 @@ export function castleLayout(): Map<number, StructSnap> {
   // free-standing towers in a row
   const t = cellOf(m.keep.x + 30, m.keep.y - 40);
   (['tower_bow', 'tower_bow', 'tower_bow', 'tower_xbow', 'tower_catapult', 'watchtower'] as StructId[]).forEach((kd, i) => put(kd, t.cx + i * 2, t.cy, kd === 'tower_bow' ? i + 1 : 1));
+  // the town: every economy and military building in a row
+  const town = cellOf(m.keep.x - 110, m.keep.y - 110);
+  (['house', 'house', 'house', 'farm', 'lumber', 'quarry', 'mine', 'mill', 'market', 'well', 'barracks', 'range', 'stable', 'infirmary', 'workshop', 'smithy'] as StructId[])
+    .forEach((kd, i) => put(kd, town.cx + (i % 8) * 3, town.cy + Math.floor(i / 8) * 3));
   // damaged run and one being built
   const d = cellOf(m.keep.x + 30, m.keep.y - 70);
   for (let i = 0; i < 6; i++) { const s = put('wall', d.cx + i, d.cy, 2); s.hp = s.maxHp * (i < 2 ? 0.5 : i < 4 ? 0.2 : 1); if (i === 5) s.build = 3; }
