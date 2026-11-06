@@ -33,7 +33,7 @@ export function siteProblem(s: GameState, kind: StructId, cx: number, cy: number
   for (let y = cy; y < cy + d.h; y++) for (let x = cx; x < cx + d.w; x++) {
     if (x < 0 || y < 0 || x >= t.cw || y >= t.ch) return 'outside';
     const i = y * t.cw + x;
-    if (kind === 'moat') { if (t.kind[i] === K.cliff) return 'blocked'; }
+    if (kind === 'moat' || kind === 'wall' || kind === 'gate') { if (t.kind[i] === K.cliff) return 'blocked'; } // ramparts may span the creek
     else if (!t.buildable(i)) return 'blocked';
     if (occ[i]) return 'occupied';
     if (enemyOn(s, x, y)) return 'enemy_near';
