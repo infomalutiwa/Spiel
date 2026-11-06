@@ -33,7 +33,7 @@ export function formationSlots(units: Unit[], f: Formation, center: Vec2, facing
   return out;
 }
 
-import { build, upgradeBuilding } from './buildings';
+import { build, lightPitch, upgradeBuilding } from './buildings';
 const inZone = (s: GameState, x: number, y: number) => {
   const z = MAPS[s.mapId].placeZone;
   return x >= z.x0 && x <= z.x1 && y >= z.y0 && y <= z.y1;
@@ -192,6 +192,13 @@ export function applyCommand(s: GameState, player: PlayerId, c: Command): Result
       if (!prepOnly && !battle) return fail('not_prep');
       const r = upgradeBuilding(s, player, c.id);
       return r ? fail(r) : { ok: true };
+    }
+
+    case 'ignite': {
+      if (!battle) return fail('not_battle');
+      const p = s.units.find(u => u.id === c.id && u.owner === player && u.type === 'pitch' && u.hp > 0);
+      if (!p) return fail('bad_command');
+      return lightPitch(s, p) ? { ok: true } : fail('cooldown');
     }
 
     case 'wall': {

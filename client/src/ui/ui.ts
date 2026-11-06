@@ -242,6 +242,7 @@ export class Ui {
     $('#wallp', this.hud).onclick = ev => {
       const b = (ev.target as HTMLElement).closest<HTMLElement>('[data-op]'); if (!b) return;
       if (b.dataset.op === 'close') { controls.wallSel = -1; controls.buildingSel = -1; controls.onChange(); return; }
+      if (b.dataset.op === 'ignite') { conn.cmd({ c: 'ignite', id: controls.buildingSel }); return; }
       if (b.dataset.op === 'bup') { conn.cmd({ c: 'bupgrade', id: controls.buildingSel }); return; }
       conn.cmd({ c: 'wall', op: b.dataset.op as 'upgrade' | 'repair' | 'rebuild', slot: controls.wallSel });
     };
@@ -249,7 +250,7 @@ export class Ui {
       const b = (ev.target as HTMLElement).closest<HTMLElement>('[data-sh]'); if (!b) return;
       const [what, troop, branch] = b.dataset.sh!.split(':');
       if (what === 'close') this.toggleSheet(false);
-      else if (what === 'build') { this.toggleSheet(false); controls.setMode({ k: 'build', kind: troop as BuildingType }); this.toast(`${BUILDINGS[troop as BuildingType].name}: tippe in den Hof, wo es stehen soll`); }
+      else if (what === 'build') { this.toggleSheet(false); controls.setMode({ k: 'build', kind: troop as BuildingType }); this.toast(`${BUILDINGS[troop as BuildingType].name}: ${troop === 'pitch' || troop === 'pit' ? 'tippe auf den Weg der Angreifer – auch vor der Außenmauer' : 'tippe in den Hof, wo es stehen soll'}`); }
       else if (what === 'barracks') conn.cmd({ c: 'barracks' });
       else if (what === 'tech') conn.cmd({ c: 'tech', troop: troop as TroopType, branch: branch ? Number(branch) : undefined });
     };
@@ -291,7 +292,7 @@ export class Ui {
         <div class="tbcur"><b>${BARRACKS[me.barracks - 1].cap} Plätze · Ausbildung ×${BARRACKS[me.barracks - 1].speed}</b></div>
         ${nextB ? `<button class="tb" data-sh="barracks" ${can(nextB) ? '' : 'disabled'}><b>Stufe ${me.barracks + 1}</b><span class="bl">${nextB.cap} Plätze · Ausbildung ×${nextB.speed}</span><span class="wc">${cost(nextB)}</span></button>` : '<div class="tbcur max"><b>Höchste Stufe</b></div>'}
       </div></div>
-      <h3 class="bh">Bauen <span class="sub">tippe danach in den Hof</span></h3>
+      <h3 class="bh">Bauen <span class="sub">Gebäude in den Hof, Fallen auch vor die Mauer</span></h3>
       <div class="trow">${BUILDING_TYPES.map(k => {
         const n = this.snap?.units.filter(u => u.owner === this.conn?.you && u.type === k).length ?? 0, i = BUILD_INFO[k];
         return `<button class="tb" data-sh="build:${k}" ${me.gold >= i.gold && n < i.max ? '' : 'disabled'}><b>${BUILDINGS[k].name} <small>${n}/${i.max}</small></b><span class="bl">${i.blurb}</span><span class="wc"><span class="coin"></span>${i.gold}</span></button>`;
@@ -375,10 +376,11 @@ export class Ui {
       else {
         const k = b.type as BuildingType, gold = this.snap.players[this.conn.you].gold, info = BUILD_INFO[k];
         const up = b.level < MAX_BUILDING_LEVEL ? info.up[b.level - 1] : 0;
+        const trap = k === 'pitch' || k === 'pit';
         const extra = k === 'goldmine' ? `<div class="hint">+${MINE_INCOME[b.level - 1]} Gold pro Sekunde</div>` : `<div class="hint">${info.blurb}</div>`;
-        p.innerHTML = `<button class="x" data-op="close">✕</button><div class="wh"><b>${BUILDINGS[k].name}</b><span class="stars">${'★'.repeat(b.level)}${'☆'.repeat(MAX_BUILDING_LEVEL - b.level)}</span></div>
+        p.innerHTML = `<button class="x" data-op="close">✕</button><div class="wh"><b>${BUILDINGS[k].name}</b>${trap ? '' : `<span class="stars">${'★'.repeat(b.level)}${'☆'.repeat(MAX_BUILDING_LEVEL - b.level)}</span>`}</div>
           <div class="wbar"><i style="width:${Math.max(0, Math.min(100, (b.hp / b.maxHp) * 100))}%"></i><span>${Math.round(b.hp)} / ${Math.round(b.maxHp)}</span></div>${extra}
-          <div class="wbtns">${b.level < MAX_BUILDING_LEVEL ? `<button class="ob wb" data-op="bup" ${up <= gold ? '' : 'disabled'}><span class="ic">⬆️</span>Verbessern<span class="wc"><span class="coin"></span>${up}</span></button>` : '<span class="hint">Höchste Stufe</span>'}</div>`;
+          <div class="wbtns">${k === 'pitch' ? (b.burning ? '<span class="hint">🔥 Brennt!</span>' : `<button class="ob wb" data-op="ignite" ${this.snap.phase === 'battle' ? '' : 'disabled'}><span class="ic">🔥</span>Anzünden<span class="wc">${this.snap.phase === 'battle' ? 'jetzt' : 'im Kampf'}</span></button>`) : trap ? '<span class="hint">Einmal-Falle</span>' : b.level < MAX_BUILDING_LEVEL ? `<button class="ob wb" data-op="bup" ${up <= gold ? '' : 'disabled'}><span class="ic">⬆️</span>Verbessern<span class="wc"><span class="coin"></span>${up}</span></button>` : '<span class="hint">Höchste Stufe</span>'}</div>`;
         p.style.display = 'block';
         return;
       }

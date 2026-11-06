@@ -4,7 +4,10 @@ import type { World } from './scene';
 
 const mat = (c: string, rough = 0.85) => new THREE.MeshStandardMaterial({ color: c, roughness: rough });
 const STONE = mat('#a9a39a'), WOOD = mat('#8a5a34'), DARK = mat('#5b3b22'), GOLD = new THREE.MeshStandardMaterial({ color: '#f2c230', roughness: 0.35, metalness: 0.5, emissive: '#7a5a00', emissiveIntensity: 0.35 });
-const WHITE = mat('#f3ede0'), RED = mat('#c9423f'), ROCK = mat('#7a6f66');
+const WHITE = mat('#f3ede0'), RED = mat('#c9423f'), ROCK = mat('#7a6f66'), STRAW = mat('#c9ad6a');
+const PITCH = new THREE.MeshStandardMaterial({ color: '#141010', roughness: 0.18, metalness: 0.2 });
+const FIRE = new THREE.MeshBasicMaterial({ color: '#ffb03a', transparent: true, opacity: 0.85 });
+const FIRE2 = new THREE.MeshBasicMaterial({ color: '#ff5a1a', transparent: true, opacity: 0.8 });
 const BANNER = [mat('#4f8fe8'), mat('#e0698f')];
 
 const box = (m: THREE.Material, w: number, h: number, d: number, x = 0, y = 0, z = 0) => {
@@ -29,6 +32,21 @@ function make(kind: BuildingType, owner: number): THREE.Group {
     const tip = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.8, 6), mat('#8e8e98')); tip.rotation.z = -Math.PI / 2; tip.position.set(2.5, 0.35, 0); arm.add(tip);
     arm.rotation.y = Math.PI; g.add(arm);
     g.add(box(BANNER[owner] ?? BANNER[0], 0.9, 0.55, 0.05, -1.2, 2.1, 1.45));
+  } else if (kind === 'pitch') {
+    const pool = new THREE.Mesh(new THREE.CircleGeometry(5.6, 28), PITCH); pool.rotation.x = -Math.PI / 2; pool.position.y = 0.08; pool.scale.set(1, 0.55, 1); pool.receiveShadow = true; g.add(pool);
+    for (let i = 0; i < 9; i++) { const a = (i / 9) * Math.PI * 2; g.add(box(DARK, 0.5, 0.35, 0.5, Math.cos(a) * 5.4, 0.15, Math.sin(a) * 3.1)); }
+    g.add(cyl(DARK, 0.55, 0.45, 0.9, -5.6, 0.45, 2.4, 10), cyl(DARK, 0.55, 0.45, 0.9, 5.4, 0.45, -2.2, 10)); // pitch barrels
+    const fl = new THREE.Group(); fl.name = 'flames'; fl.visible = false;
+    for (let i = 0; i < 14; i++) {
+      const f = new THREE.Mesh(new THREE.ConeGeometry(0.7 + (i % 3) * 0.25, 2.2 + (i % 4) * 0.6, 7), i % 2 ? FIRE : FIRE2);
+      const a = (i / 14) * Math.PI * 2, r = 1.2 + (i % 3) * 1.4; f.position.set(Math.cos(a) * r, 1.1, Math.sin(a) * r * 0.55); fl.add(f);
+    }
+    const light = new THREE.PointLight('#ff8a3a', 0, 22, 1.6); light.position.y = 2.5; light.name = 'glow'; fl.add(light);
+    g.add(fl);
+  } else if (kind === 'pit') {
+    g.add(box(STRAW, 5.2, 0.12, 5.2, 0, 0.06, 0));
+    for (let i = -2; i <= 2; i++) g.add(box(WOOD, 0.22, 0.14, 5.4, i * 1.1, 0.14, 0));
+    for (const [x, z] of [[-2.7, -2.7], [2.7, -2.7], [-2.7, 2.7], [2.7, 2.7]]) g.add(cyl(DARK, 0.06, 0.12, 0.9, x, 0.45, z, 5));
   } else if (kind === 'goldmine') {
     const hill = new THREE.Mesh(new THREE.DodecahedronGeometry(2.8, 0), ROCK); hill.scale.set(1.2, 0.8, 1.1); hill.position.y = 1.2; hill.castShadow = true; g.add(hill);
     g.add(box(WOOD, 0.4, 2.8, 0.4, 1.9, 1.4, 1.2), box(WOOD, 0.4, 2.8, 0.4, 1.9, 1.4, -1.2), box(WOOD, 0.4, 0.4, 3.2, 1.9, 2.9, 0));
@@ -79,6 +97,14 @@ export class BuildingViews {
       v.root.scale.setScalar(1 + 0.1 * (u.level - 1));
       v.root.rotation.z = f < 0.4 ? (1 - f / 0.4) * 0.06 : 0;
       v.root.position.x += Math.sin(this.t * 60) * 0.1 * (v.hit / 0.2);
+      if (v.kind === 'pitch' || v.kind === 'pit') { v.root.scale.setScalar(1); v.root.rotation.z = 0; }
+      if (v.kind === 'pitch') {
+        const fl = v.root.getObjectByName('flames')!; fl.visible = u.burning;
+        if (u.burning) fl.children.forEach((c, i) => {
+          if (c instanceof THREE.PointLight) { c.intensity = 60 + Math.sin(this.t * 17) * 15; return; }
+          const k = 0.75 + 0.35 * Math.abs(Math.sin(this.t * (7 + i) + i * 1.7)); c.scale.set(1, k * 1.6, 1); c.position.y = 0.8 * k * 1.6;
+        });
+      }
       if (v.kind === 'goldmine') v.root.children.forEach((c, i) => { if (c instanceof THREE.Mesh && c.material === GOLD) c.rotation.y = this.t * 1.2 + i; });
     }
     for (const [id, v] of this.views) if (!seen.has(id)) { this.group.remove(v.root); this.views.delete(id); }

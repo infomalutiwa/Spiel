@@ -1,5 +1,5 @@
 import {
-  DAMAGE_VS_ARMOR, DECK_COVER, DECK_DAMAGE, DECK_RANGE, TROOPS, UNIT_DEFS, branchOf, isFixedType, isStructureType, levelArmorBonus,
+  DAMAGE_VS_ARMOR, DECK_COVER, DECK_DAMAGE, DECK_RANGE, TROOPS, UNIT_DEFS, branchOf, isFixedType, isStructureType, isTrapType, levelArmorBonus,
   type GameState, type PlayerId, type Unit,
 } from '@burgwacht/shared';
 import { edgeDist, getUnit, pushEvent } from './state';
@@ -7,6 +7,7 @@ import { dropFromWall } from './fortress';
 import { castlePos, moveToward } from './movement';
 import { gridOf } from './grid';
 import { levelDamage } from './tech';
+import { fireAt } from './buildings';
 import { artilleryTurn, nearestThreat } from './artillery';
 
 const isTroop = (u: Unit) => Object.hasOwn(TROOPS, u.type);
@@ -117,9 +118,9 @@ export function ignite(victim: Unit, owner: PlayerId | null, dps: number, secs: 
 
 /** per-tick status effects: burning pulses twice a second and spreads to neighbours, slowness runs out */
 function stepStatus(s: GameState, u: Unit, dt: number): void {
-  if (u.t2 > 0 && isStructureType(u.type)) u.t2 = Math.max(0, u.t2 - dt); // repair cooldown of walls, gates and towers
+  if (u.t2 > 0 && isStructureType(u.type) && !isTrapType(u.type)) u.t2 = Math.max(0, u.t2 - dt); // repair cooldown of walls, gates and towers
   if (u.slow > 0) u.slow = Math.max(0, u.slow - dt);
-  if (u.burn <= 0) return;
+  if (u.burn <= 0 || isTrapType(u.type)) return;
   const before = u.burn;
   u.burn = Math.max(0, u.burn - dt);
   if (u.burn <= 0) { u.burnDps = 0; u.burnBy = -1; }
@@ -156,7 +157,7 @@ export function pickTarget(s: GameState, u: Unit, reach: number): Unit | undefin
     const d = edgeDist(u, o);
     if (d > reach) return;
     if (isStructureType(o.type)) {
-      if (u.side !== 'enemy' || (!siege && o.type !== 'gate')) return;
+      if (u.side !== 'enemy' || (!siege && o.type !== 'gate') || isTrapType(o.type)) return;
       if (d < buildD || (d === buildD && build && o.id < build.id)) { build = o; buildD = d; }
       return;
     }
@@ -207,6 +208,7 @@ function attack(s: GameState, u: Unit, t: Unit): void {
   const credit: Credit = { owner: u.owner, unit: u };
   const charged = chargeReady(u);
   if (charged) pushEvent(s, { k: 'aoe', x: t.x, y: t.y, r: 3.2, kind: 'siege' }); // dust cloud of the charge
+  if (br === 'fire') fireAt(s, t.x, t.y);
   pushEvent(s, { k: 'shot', from: u.id, to: t.id, x: u.x, y: u.y, tx: t.x, ty: t.y, kind: def.damageKind, ...(br === 'fire' ? { fire: true } : {}) });
   if (def.special === 'aoe' && def.areaRadius) { // mages: instant blast around the target
     pushEvent(s, { k: 'aoe', x: t.x, y: t.y, r: def.areaRadius, kind: br === 'frost' ? 'frost' : 'magic' });

@@ -1,7 +1,7 @@
 import { audio } from '../audio';
 import * as THREE from 'three';
 import {
-  SQUAD_SIZE, UNIT_DEFS, canManWalls, isBuildingType, wallLineAt, type AbilityId, type BuildingType, type Command, type Formation, type Snapshot, type TroopType, type UnitSnap,
+  SQUAD_SIZE, UNIT_DEFS, buildArea, canManWalls, isBuildingType, wallLineAt, type AbilityId, type BuildingType, type Command, type Formation, type Snapshot, type TroopType, type UnitSnap,
 } from '@burgwacht/shared';
 import type { Connection } from '../net/connection';
 import type { World } from '../render/scene';
@@ -409,8 +409,8 @@ export class Controls {
       if (this.ghost) this.ghost.visible = false;
       this.crownGhost.visible = false;
       if (mode.k === 'build' && g) {
-        const zn = this.world.map.placeZone, ok = g.x >= zn.x0 && g.x <= zn.x1 && g.y >= zn.y0 && g.y <= zn.y1;
-        this.ringGhost.visible = true; this.ringGhost.position.set(g.x, 0.15, g.y); this.ringGhost.scale.setScalar(3.4);
+        const zn = buildArea(this.world.map, mode.kind), ok = g.x >= zn.x0 && g.x <= zn.x1 && g.y >= zn.y0 && g.y <= zn.y1;
+        this.ringGhost.visible = true; this.ringGhost.position.set(g.x, 0.15, g.y); this.ringGhost.scale.setScalar(Math.max(3.4, UNIT_DEFS[mode.kind].radius));
         (this.ringGhost.material as THREE.MeshBasicMaterial).color.set(ok ? '#fff3c4' : '#ff8d8d');
       } else if (mode.k === 'ability' && g) {
         this.ringGhost.visible = true; this.ringGhost.position.set(g.x, 0.15, g.y);

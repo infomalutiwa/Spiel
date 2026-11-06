@@ -1,4 +1,4 @@
-import type { BuildingType, StructureType, UnitDef } from '../types';
+import type { BuildingType, MapDef, StructureType, UnitDef } from '../types';
 
 /** walls, gates and towers are units that never move; the enemy has to break them */
 export const STRUCTURES: Record<StructureType, UnitDef> = {
@@ -30,6 +30,14 @@ export const BUILDINGS: Record<BuildingType, UnitDef> = {
     name: 'Goldmine', hp: 700, armor: 'structure', armorValue: 20, damage: 0, damageKind: 'pierce',
     range: 0, speed: 0.01, cost: 0, morale: 100, cooldown: 1, radius: 2.8,
   },
+  pitch: {
+    name: 'Pechgraben', hp: 400, armor: 'structure', armorValue: 0, damage: 0, damageKind: 'pierce',
+    range: 0, speed: 0.01, cost: 0, morale: 100, cooldown: 1, radius: 6,
+  },
+  pit: {
+    name: 'Fallgrube', hp: 400, armor: 'structure', armorValue: 0, damage: 0, damageKind: 'pierce',
+    range: 0, speed: 0.01, cost: 0, morale: 100, cooldown: 1, radius: 3.4,
+  },
   infirmary: {
     name: 'Lazarett', hp: 800, armor: 'structure', armorValue: 20, damage: 0, damageKind: 'pierce',
     range: 0, speed: 0.01, cost: 0, morale: 100, cooldown: 1, radius: 2.8,
@@ -43,6 +51,8 @@ export const BUILD_INFO: Record<BuildingType, { gold: number; up: [number, numbe
   ballista: { gold: 420, up: [480, 760], max: 3, blurb: 'Ein mächtiger Bolzen alle paar Sekunden, durchschlägt Rüstung, 38 Meter weit.' },
   goldmine: { gold: 320, up: [300, 520], max: 3, blurb: 'Bringt dir ständig Gold – je höher die Stufe, desto mehr.' },
   infirmary: { gold: 380, up: [420, 700], max: 2, blurb: 'Heilt Truppen in der Nähe, auch im Kampf.' },
+  pitch: { gold: 180, up: [0, 0], max: 4, blurb: 'Ein Graben voll Pech. Feuerpfeile, Brandsteine oder dein Befehl entzünden ihn: 10 Sekunden Flammenmeer.' },
+  pit: { gold: 140, up: [0, 0], max: 6, blurb: 'Gut getarnt: Wer hineinfällt, nimmt schweren Schaden. Hält nur einmal.' },
 };
 /** gold per second a goldmine pays at a level */
 export const MINE_INCOME = [0.9, 1.6, 2.5];
@@ -50,6 +60,14 @@ export const MINE_INCOME = [0.9, 1.6, 2.5];
 export const INFIRMARY_HEAL = [0.02, 0.035, 0.05];
 export const INFIRMARY_RADIUS = 15;
 export const MAX_BUILDING_LEVEL = 3;
+/** traps: walked over, never attacked, used up when they go off */
+export const isTrapType = (t: string): t is 'pitch' | 'pit' => t === 'pitch' || t === 'pit';
+export const PITCH_BURN = 10, PITCH_DPS = 22, PIT_DAMAGE = 260;
+/** where a building may stand: buildings in the courtyard, traps also out in front of the outer wall */
+export function buildArea(map: MapDef, kind: BuildingType) {
+  const z = map.placeZone;
+  return isTrapType(kind) ? { ...z, x1: Math.min(map.width - 25, map.barriers[0].x + 40) } : z;
+}
 export const BUILDING_SPACING = 6;
 
 export const STRUCTURE_TYPES = Object.keys(STRUCTURES) as StructureType[];

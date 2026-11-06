@@ -10,7 +10,7 @@ export type EnemyType =
   | 'raider_catapult' | 'shaman' | 'brute' | 'ironguard' | 'warlord';
 export type StructureType = 'wall' | 'gate' | 'tower';
 /** free-standing buildings the players put up in the courtyard */
-export type BuildingType = 'bowtower' | 'ballista' | 'goldmine' | 'infirmary';
+export type BuildingType = 'bowtower' | 'ballista' | 'goldmine' | 'infirmary' | 'pitch' | 'pit';
 export type UnitType = TroopType | EnemyType | StructureType | BuildingType | 'castle';
 export type Special = 'heal' | 'aoe' | 'buff';
 /** what a unit is good at; the AI in combat.ts picks targets and positions by role (see data/troops.ts) */
@@ -215,6 +215,8 @@ export type Command =
   | { c: 'build'; kind: BuildingType; x: number; y: number }
   /** next level of a building (max 3) */
   | { c: 'bupgrade'; id: number }
+  /** sets an own pitch ditch on fire */
+  | { c: 'ignite'; id: number }
   | { c: 'wall'; op: 'upgrade' | 'repair' | 'rebuild'; slot: number }
   | { c: 'place'; ids: number[]; x: number; y: number }
   | { c: 'move'; ids: number[]; x: number; y: number; formation?: Formation }

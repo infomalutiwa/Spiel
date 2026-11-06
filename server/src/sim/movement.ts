@@ -1,4 +1,4 @@
-import { MAPS, UNIT_DEFS, isFixedType, isStructureType, type GameState, type Unit } from '@burgwacht/shared';
+import { MAPS, UNIT_DEFS, isFixedType, isStructureType, isTrapType, type GameState, type Unit } from '@burgwacht/shared';
 import { castleOf, rand } from './state';
 import { gridOf } from './grid';
 
@@ -74,7 +74,7 @@ export function separate(s: GameState): void {
     if (e.hp <= 0 || e.side !== 'enemy') continue;
     const re = UNIT_DEFS[e.type].radius * 0.8;
     grid.near(e.x, e.y, re + 8, st => {
-      if (st.hp <= 0 || !isStructureType(st.type)) return;
+      if (st.hp <= 0 || !isStructureType(st.type) || isTrapType(st.type)) return;
       const min = UNIT_DEFS[st.type].radius + re;
       let dx = e.x - st.x, dy = e.y - st.y;
       const d = Math.hypot(dx, dy);

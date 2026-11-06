@@ -1,4 +1,5 @@
-import { MAPS, UNIT_DEFS, branchOf, isStructureType, type GameState, type Unit } from '@burgwacht/shared';
+import { MAPS, UNIT_DEFS, branchOf, isStructureType, isTrapType, type GameState, type Unit } from '@burgwacht/shared';
+import { fireAt } from './buildings';
 import { applyDamage, ignite, resolveDamage } from './combat';
 import { moveToward } from './movement';
 import { gridOf } from './grid';
@@ -33,7 +34,7 @@ function chooseAim(s: GameState, u: Unit): Aim | undefined {
   const foes: Unit[] = [];
   gridOf(s).near(u.x, u.y, max + 10, o => {
     if (o.hp <= 0 || o.side === u.side) return;
-    if (o.type === 'castle' || (isStructureType(o.type) && u.side === 'player')) return;
+    if (o.type === 'castle' || isTrapType(o.type) || (isStructureType(o.type) && u.side === 'player')) return;
     if (Math.hypot(o.x - u.x, o.y - u.y) <= max + 2) foes.push(o);
   });
   if (!foes.length) return undefined;
@@ -102,6 +103,7 @@ export function stepShells(s: GameState, dt: number): void {
     if (sh.t > 0) { keep.push(sh); continue; }
     const def = UNIT_DEFS[sh.src.type], R = blastRadius(sh.src), edge = def.edge ?? 0.5;
     pushEvent(s, { k: 'aoe', x: sh.tx, y: sh.ty, r: R, kind: sh.fire ? 'fire' : 'siege' });
+    if (sh.fire) fireAt(s, sh.tx, sh.ty, R);
     const victims: Unit[] = [];
     gridOf(s).near(sh.tx, sh.ty, R + 9, v => { if (v.hp > 0 && v.side !== sh.side) victims.push(v); });
     victims.sort((a, b) => a.id - b.id);

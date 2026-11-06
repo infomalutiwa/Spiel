@@ -43,3 +43,35 @@ describe('buildings', () => {
     expect(k.hp).toBeGreaterThan(k.maxHp * 0.35);
   });
 });
+
+describe('traps', () => {
+  const front = () => ({ x: MAPS.meadow.barriers[0].x + 20, y: MAPS.meadow.barriers[0].gateY });
+  it('may be built in front of the outer wall, buildings may not', () => {
+    const s = createGame('meadow', 1);
+    expect(applyCommand(s, 0, { c: 'build', kind: 'pit', ...front() })).toEqual({ ok: true });
+    expect(applyCommand(s, 0, { c: 'build', kind: 'bowtower', ...front() })).toMatchObject({ ok: false, reason: 'outside_zone' });
+  });
+  it('a pit hits whoever steps in once, then is gone; enemies never attack traps', () => {
+    const s = battle(); s.players[0].gold = 5000;
+    const p = front();
+    applyCommand(s, 0, { c: 'build', kind: 'pit', ...p });
+    const e = foe(s, 'footman', p.x + 1, p.y), hp = e.hp;
+    run(s, 0.5);
+    expect(e.hp).toBeLessThan(hp);
+    expect(buildingsOf(s, 0, 'pit')).toHaveLength(0);
+  });
+  it('a pitch ditch burns enemies once lit and is used up afterwards', () => {
+    const s = battle(); s.players[0].gold = 5000;
+    const p = front();
+    applyCommand(s, 0, { c: 'build', kind: 'pitch', ...p });
+    const ditch = buildingsOf(s, 0, 'pitch')[0];
+    const e = foe(s, 'ironguard', p.x, p.y + 2), hp = e.hp;
+    run(s, 1);
+    expect(e.hp).toBe(hp); // not lit yet: nothing happens
+    expect(applyCommand(s, 0, { c: 'ignite', id: ditch.id })).toEqual({ ok: true });
+    run(s, 3);
+    expect(e.hp).toBeLessThan(hp);
+    run(s, 9);
+    expect(buildingsOf(s, 0, 'pitch')).toHaveLength(0);
+  });
+});
