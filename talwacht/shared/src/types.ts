@@ -155,6 +155,8 @@ export interface UnitSnap {
 export interface StructSnap {
   id: number; kind: StructId; cx: number; cy: number; w: number; h: number; level: number;
   hp: number; maxHp: number; owner: PlayerId; build: number; state: number; burning: number; pitch: number;
+  /** trap used up (open pit, burnt ditch, rolled logs) */
+  spent?: boolean;
 }
 export interface QueueSnap { id: number; jobs: [TroopId, PlayerId, number][]; research: [SmithyId, number] | null; rally: [number, number] | null; dry: boolean }
 export interface SquadSnap { id: number; owner: PlayerId; type: TroopId; n: number; hp: number; order: OrderKind; stars: number }

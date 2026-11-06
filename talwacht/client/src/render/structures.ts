@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CELL, isWallish, K, STRUCTURES, wallMask, type StructId, type StructSnap, type Terrain } from '@talwacht/shared';
-import { gateParts, keepGeometry, kitMaterial, pitchGeometry, scaffoldGeometry, towerGeometry, towerPlatform, wallGeometry } from './castlekit';
+import { gateParts, keepGeometry, kitMaterial, pitchGeometry, scaffoldGeometry, towerGeometry, towerPlatform, trapGeometry, wallGeometry } from './castlekit';
 import { modelInstance } from './assets';
 
 /** KayKit buildings for the town and economy (blue roofs to match the castle kit) */
@@ -69,7 +69,7 @@ export class StructureViews {
       if (s.kind === 'wall') continue;
       seen.add(s.id);
       const mask = isWallish(s.kind) ? wallMask(isWall, isCliff, s.cx, s.cy) : 0;
-      const k = `${s.kind}:${s.level}:${s.pitch}:${damageOf(s)}:${mask}:${Math.round(progressOf(s) * 10)}:${s.kind === 'pitfall' || s.kind === 'pitch_ditch' ? s.state : ''}`;
+      const k = `${s.kind}:${s.level}:${s.pitch}:${damageOf(s)}:${mask}:${Math.round(progressOf(s) * 10)}:${s.spent ? 'x' : ''}`;
       let v = this.views.get(s.id);
       if (!v || v.key !== k) {
         if (v) this.dispose(v);
@@ -150,6 +150,10 @@ export class StructureViews {
       }
       const n = STRUCTURES[s.kind].tower?.shooters[Math.min(s.level, STRUCTURES[s.kind].tower!.shooters.length) - 1] ?? 0;
       if (s.build <= 0 && (s.kind === 'tower_bow' || s.kind === 'tower_xbow')) this.garrison.set(s.id, { x: cx, y: cy, z: gh + plat + 0.15, n, face: Math.PI });
+    } else if (STRUCTURES[s.kind].cat === 'trap') {
+      const spent = !!s.spent;
+      const tm = mesh(this.geo(`trap:${s.kind}:${spent}`, () => trapGeometry(s.kind, spent)));
+      tm.castShadow = false; root.add(tm);
     } else if (BUILDING_MODEL[s.kind]) {
       const file = s.kind === 'house' && s.id % 2 ? HOUSE_ALT : BUILDING_MODEL[s.kind]!;
       const size = s.kind === 'well' ? 3.2 : s.w * CELL * (s.kind === 'mill' ? 0.8 : 0.92);

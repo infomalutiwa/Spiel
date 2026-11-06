@@ -1,4 +1,4 @@
-import { cellOf, MAPS, STRUCTURES, type StructId, type StructSnap } from '@talwacht/shared';
+import { cellOf, ENEMY_IDS, MAPS, STRUCTURES, TROOP_IDS, type StructId, type StructSnap, type UnitSnap } from '@talwacht/shared';
 
 /** a test layout of every rampart shape, tier, gate and tower (`?gallery=castle`) */
 export function castleLayout(): Map<number, StructSnap> {
@@ -28,5 +28,20 @@ export function castleLayout(): Map<number, StructSnap> {
   // damaged run and one being built
   const d = cellOf(m.keep.x + 30, m.keep.y - 70);
   for (let i = 0; i < 6; i++) { const s = put('wall', d.cx + i, d.cy, 2); s.hp = s.maxHp * (i < 2 ? 0.5 : i < 4 ? 0.2 : 1); if (i === 5) s.build = 3; }
+  return out;
+}
+
+/** every troop (two rows, one per player) and every enemy, plus a small testudo (`?gallery=units`) */
+export function unitLayout(x0: number, y0: number): UnitSnap[] {
+  const out: UnitSnap[] = [];
+  let id = 1000;
+  const add = (type: UnitSnap['type'], side: 'p' | 'e', owner: 0 | 1 | null, x: number, y: number, extra: Partial<UnitSnap> = {}) =>
+    out.push({ id: id++, type, side, owner, x, y, z: 0, hp: 100, maxHp: 100, facing: side === 'p' ? -Math.PI / 2 : Math.PI / 2, anim: 0, squad: side === 'p' ? 7 + (owner ?? 0) : 0, burning: false, slowed: false, stunned: false, shielded: false, ...extra });
+  TROOP_IDS.forEach((t, i) => { add(t, 'p', 0, x0 + i * 4.5, y0 + 6); add(t, 'p', 1, x0 + i * 4.5, y0 + 11, { hp: 60 }); });
+  ENEMY_IDS.filter(t => t !== 'ram' && t !== 'trebuchet' && t !== 'siege_tower').forEach((t, i) => add(t, 'e', null, x0 + i * 4.5, y0 - 4, { anim: i % 3 === 0 ? 2 : 0 }));
+  add('ram', 'e', null, x0 + 50, y0 - 14);
+  for (let i = 0; i < 12; i++) add('e_shield', 'e', null, x0 + 47.5 + (i % 4) * 1.25 * 1.3, y0 - 17 + Math.floor(i / 4) * 2.2, { shielded: true });
+  add('trebuchet', 'e', null, x0 + 10, y0 - 22);
+  add('siege_tower', 'e', null, x0 + 26, y0 - 22, { burning: true });
   return out;
 }

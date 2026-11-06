@@ -2,6 +2,7 @@ import {
   MAPS, DEFAULT_MAP, PROTOCOL_VERSION, structDeltas, toWire, TALENTS, UNLOCKS,
   type ClientMsg, type Difficulty, type GameState, type PlayerId, type ServerMsg, type Snapshot, type StructSnap, type TalentId, type WireSnapshot,
 } from '@talwacht/shared';
+import { trapSpent } from '../sim/traps';
 import { applyCommand, armyCap, createGame, deserialize, rate, serialize, soldiers, tick, timeline } from '../sim/index';
 
 export interface Socket { send(data: string): void; close(): void }
@@ -124,6 +125,7 @@ export class Room {
     const structs: StructSnap[] | undefined = full ? s.structs.map(st => ({
       id: st.id, kind: st.kind, cx: st.cx, cy: st.cy, w: st.w, h: st.h, level: st.level, hp: Math.round(st.hp), maxHp: Math.round(st.maxHp),
       owner: st.owner, build: Math.round(st.build * 10) / 10, state: st.state, burning: st.burning > 0 ? 1 : 0, pitch: st.pitch,
+      spent: trapSpent(st) || undefined,
     })) : undefined;
     const boss = s.units.find(u => u.type === 'warlord' && u.hp > 0);
     const snap: Snapshot = {

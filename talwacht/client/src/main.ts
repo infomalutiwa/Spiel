@@ -4,7 +4,9 @@ import { World } from './render/scene';
 import { buildTerrainMesh, buildWater } from './render/terrain';
 import { buildScenery } from './render/scenery';
 import { StructureViews } from './render/structures';
-import { castleLayout } from './gallery';
+import { castleLayout, unitLayout } from './gallery';
+import { UnitViews } from './render/units';
+import { Effects } from './render/effects';
 
 initViewport();
 const params = new URLSearchParams(location.search);
@@ -36,7 +38,21 @@ function loop(now: number) {
 }
 requestAnimationFrame(loop);
 
-if (params.get('gallery') === 'castle') {
+if (params.get('gallery') === 'units') {
+  loadMap('gruental').then(t => {
+    const sv = new StructureViews(t, world.content);
+    const views = new UnitViews(world, () => sv);
+    const fx = new Effects(world);
+    const layout = castleLayout();
+    sv.sync(layout, 0.016);
+    const units = unitLayout(t.map.keep.x - 40, t.map.keep.y - 110);
+    const snap = { units } as never;
+    let tt = 0;
+    setInterval(() => { tt += 0.05; for (const u of units) if (u.anim === 2) u.facing = -Math.PI / 2; views.sync({ a: snap, b: snap, alpha: 0 }, 0, new Set([units[0].squad]), 0.05); fx.update(0.05, views, layout.values()); }, 50);
+    world.target.set(t.map.keep.x - 18, 0, t.map.keep.y - 104); world.dist = Number(params.get('dist') ?? 48); world.yaw = Number(params.get('yaw') ?? 0.2);
+    setTimeout(() => ((window as unknown as { __ready: boolean }).__ready = true), 4000);
+  });
+} else if (params.get('gallery') === 'castle') {
   loadMap('gruental').then(t => {
     const views = new StructureViews(t, world.content);
     const layout = castleLayout();

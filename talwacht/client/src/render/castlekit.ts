@@ -270,3 +270,48 @@ export function scaffoldGeometry(w: number, h: number, d: number) {
   }
   return merge(parts);
 }
+
+/** trap pieces on one 4-m cell (ground at y = 0); `spent` shows the used / open state */
+export function trapGeometry(kind: StructId, spent: boolean): THREE.BufferGeometry {
+  seed = 12000 + kind.length * 7 + (spent ? 1 : 0);
+  const p: THREE.BufferGeometry[] = [];
+  const dirt = '#5a4630', dark = '#2b2016';
+  switch (kind) {
+    case 'spikes':
+      p.push(box(3.4, 0.12, 3.4, 0, 0.03, 0, dark));
+      if (!spent) for (let i = 0; i < 16; i++) { const g = cone(0.12, 0.9, -1.3 + (i % 4) * 0.87, 0.45, -1.3 + Math.floor(i / 4) * 0.87, '#8f949c', 5); p.push(g); }
+      break;
+    case 'pitfall':
+      p.push(box(3.4, 0.1, 3.4, 0, 0.03, 0, spent ? '#140f0a' : '#7d6a45'));
+      if (!spent) for (let i = 0; i < 5; i++) p.push(box(3.3, 0.08, 0.14, 0, 0.1, -1.4 + i * 0.7, '#9a8456'));
+      else for (const s of [-1, 1]) { p.push(box(3.6, 0.3, 0.3, 0, 0.12, s * 1.75, dirt), box(0.3, 0.3, 3.6, s * 1.75, 0.12, 0, dirt)); }
+      break;
+    case 'pitch_ditch':
+      p.push(box(3.8, 0.1, 3.0, 0, 0.02, 0, spent ? '#3b3026' : '#141012'));
+      for (const s of [-1, 1]) p.push(box(3.8, 0.35, 0.4, 0, 0.15, s * 1.6, dirt));
+      break;
+    case 'caltrops':
+      for (let i = 0; i < 26; i++) { const x = (rnd() - 0.5) * 3.4, z = (rnd() - 0.5) * 3.4; p.push(box(0.22, 0.12, 0.22, x, 0.06, z, '#6d7179', rnd() * 3)); }
+      break;
+    case 'stakes':
+      for (let i = 0; i < 7; i++) { const g = cyl(0.01, 0.13, 2.4, 0, 0, 0, KIT.wood, 5); g.rotateX(-0.75).translate(-1.6 + i * 0.53, 0.8, -0.2); p.push(g); }
+      p.push(box(3.8, 0.3, 0.3, 0, 0.15, 0.4, KIT.woodDark));
+      break;
+    case 'log_trap':
+      for (const s of [-1, 1]) p.push(box(0.3, 1.4, 0.3, s * 1.7, 0.7, 0.9, KIT.woodDark));
+      if (!spent) for (let i = 0; i < 4; i++) { const g = cyl(0.42, 0.42, 3.6, 0, 0, 0, KIT.wood, 7); g.rotateZ(Math.PI / 2).translate(0, 0.45 + (i > 2 ? 0.75 : 0), -0.6 + (i % 3) * 0.86 - (i > 2 ? 0.43 : 0)); p.push(g); }
+      break;
+    case 'rockslide':
+      for (let i = 0; i < 9; i++) p.push(box(0.8 + rnd() * 0.9, 0.7 + rnd() * 0.7, 0.8 + rnd() * 0.9, (rnd() - 0.5) * 3, 0.5 + rnd() * 0.8, (rnd() - 0.5) * 3, KIT.stoneDark, rnd() * 3, 0.12));
+      p.push(box(3.6, 0.3, 0.3, 0, 0.6, -1.7, KIT.woodDark));
+      break;
+    case 'powder':
+      for (const [x, z] of [[-0.6, -0.4], [0.6, -0.4], [0, 0.6]]) { p.push(cyl(0.55, 0.5, 1.2, x, 0.6, z, '#7a5634', 10), cyl(0.57, 0.57, 0.1, x, 0.35, z, KIT.iron, 10), cyl(0.57, 0.57, 0.1, x, 0.95, z, KIT.iron, 10)); }
+      break;
+    case 'moat':
+      p.push(box(4.0, 0.2, 4.0, 0, -0.35, 0, '#2f6f96'));
+      break;
+  }
+  const g = mergeGeometries(p.length ? p : [box(0.1, 0.1, 0.1, 0, -1, 0, dark)], false)!;
+  g.computeVertexNormals(); return g;
+}
