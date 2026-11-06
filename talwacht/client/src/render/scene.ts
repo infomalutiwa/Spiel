@@ -12,7 +12,7 @@ export const LOOKS: Record<MapDef['theme'], Look> = {
   green: { sky: '#6fa8d8', horizon: '#f2dcb6', fog: '#d9dcc4', sun: '#ffe2b0', sunI: 2.7, hemiSky: '#fff1d6', hemiGround: '#5a7a3a', exposure: 0.98 },
   gorge: { sky: '#6c9fcc', horizon: '#ecd5b0', fog: '#d4d0bc', sun: '#ffdcaa', sunI: 2.6, hemiSky: '#f6ecd6', hemiGround: '#5c6c3c', exposure: 1.04 },
   river: { sky: '#72acd9', horizon: '#f0dfbe', fog: '#d6dfcc', sun: '#ffe4b6', sunI: 2.6, hemiSky: '#fff3dc', hemiGround: '#557a40', exposure: 1.05 },
-  snow: { sky: '#86b2dc', horizon: '#e6eef6', fog: '#dfe7ef', sun: '#fff0d8', sunI: 2.5, hemiSky: '#f4f8ff', hemiGround: '#8a96a6', exposure: 1.02 },
+  snow: { sky: '#86b2dc', horizon: '#e6eef6', fog: '#dfe7ef', sun: '#fff0d8', sunI: 2.2, hemiSky: '#eef3fa', hemiGround: '#7c8898', exposure: 0.82 },
 };
 
 /** renderer, camera rig (target + distance + yaw + pitch), sun, sky and fog */
@@ -37,7 +37,7 @@ export class World {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: !LOW && !MOBILE, powerPreference: 'high-performance' });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, LOW ? 1 : MOBILE ? 1.6 : 2));
     this.renderer.shadowMap.enabled = !LOW;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.scene.add(this.hemi, this.sun, this.sun.target, this.content);
@@ -83,7 +83,7 @@ export class World {
     this.hemi.groundColor.set(L.hemiGround).lerp(new THREE.Color('#1c2030'), n);
     this.hemi.intensity = 1.0 - n * 0.55;
     this.renderer.toneMappingExposure = L.exposure * (1 - n * 0.25);
-    if (this.hdr) { this.scene.backgroundIntensity = 0.95 * (1 - n * 0.88); this.scene.environmentIntensity = 0.55 * (1 - n * 0.7); }
+    if (this.hdr) { this.scene.backgroundIntensity = 0.95 * (1 - n * 0.88); this.scene.environmentIntensity = 0.35 * (1 - n * 0.7); }
   }
 
   /** place the camera from the rig and keep the sun's shadow box on what we look at */

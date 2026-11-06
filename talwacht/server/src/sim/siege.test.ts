@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { cellOf, MAPS, type GameState, type Unit } from '@talwacht/shared';
-import { createGame, newStructure, terrainOf } from './state';
+import { createGame, newStructure, terrainOf, structAtCell } from './state';
+import { followPath } from './flowfield';
 import { spawnTestudo, siegeTick } from './siege';
 import { combatTick, damage, fireShell, shellTick, cleanup } from './combat';
 import { tickMovement, spawnEnemy } from './movement';
@@ -17,10 +18,17 @@ const wx = (W.cx + 0.5) * 4, wy = (W.cy + 0.5) * 4;
 function wallRow(s: GameState, gateAtMid = false) {
   const t = terrainOf(s);
   for (let cx = 0; cx < t.cw; cx++) if (t.kind[W.cy * t.cw + cx] !== 5) {
-    const st = newStructure(s, gateAtMid && cx === W.cx ? 'gate' : 'wall', cx, W.cy, 0, true);
-    if (st.kind === 'wall') { st.level = 2; st.hp = st.maxHp = 900; }
+    const st = newStructure(s, 'wall', cx, W.cy, 0, true);
+    st.level = 2; st.hp = st.maxHp = 900;
+  }
+  if (gateAtMid) { // the gate goes where the enemy route meets the wall
+    const hit = crossing(s);
+    s.structs.splice(s.structs.indexOf(structAtCell(s, hit, W.cy)!), 1); s.sRev++;
+    newStructure(s, 'gate', hit, W.cy, 0, true);
   }
 }
+/** wall cell where enemies coming down the middle meet the wall row */
+const crossing = (s: GameState) => followPath(s, W.cx, W.cy - 12).find(([, y]) => y === W.cy)![0];
 function run(s: GameState, sec: number) {
   for (let i = 0; i < sec * 20; i++) {
     s.time += 0.05; s.tick++; indexUnits(s);
@@ -56,7 +64,7 @@ describe('testudo', () => {
   it('a pitch nose over the gate kills at least 30 % of a 16-shield testudo within 20 s', () => {
     const s = fresh(); wallRow(s, true);
     const gate = s.structs.find(x => x.kind === 'gate')!; gate.pitch = 1;
-    const f = spawnTestudo(s, wx, wy - 30, 0, 16, 1);
+    const f = spawnTestudo(s, (gate.cx + 0.5) * 4, wy - 30, 0, 16, 1);
     run(s, 20);
     const alive = f.members.filter(id => s.units.some(u => u.id === id && u.hp > 0)).length;
     expect(16 - alive).toBeGreaterThanOrEqual(5);
@@ -83,8 +91,8 @@ describe('siege', () => {
 
   it('a miner brings a wall cell down after 25 s', () => {
     const s = fresh(); wallRow(s);
-    const target = s.structs.find(x => x.kind === 'wall' && x.cx === W.cx)!;
-    const m = spawnEnemy(s, 'miner', wx, wy - 3.5, 0, 1); m.hp = m.maxHp = 1e6;
+    const cx = crossing(s), target = structAtCell(s, cx, W.cy)!;
+    const m = spawnEnemy(s, 'miner', (cx + 0.5) * 4, wy - 3.5, 0, 1); m.hp = m.maxHp = 1e6;
     run(s, 24);
     expect(s.structs.includes(target)).toBe(true);
     run(s, 1.6);
@@ -93,10 +101,10 @@ describe('siege', () => {
 
   it('engineers nearby stop a miner', () => {
     const s = fresh(); wallRow(s);
-    const target = s.structs.find(x => x.kind === 'wall' && x.cx === W.cx)!;
-    spawnEnemy(s, 'miner', wx, wy - 3.5, 0, 1);
-    const q = spawnSquad(s, 0, 'engineer', wx, wy + 6);
-    setOrder(s, q, 'hold', wx, wy + 6);
+    const cx = crossing(s), target = structAtCell(s, cx, W.cy)!, mx = (cx + 0.5) * 4;
+    spawnEnemy(s, 'miner', mx, wy - 3.5, 0, 1);
+    const q = spawnSquad(s, 0, 'engineer', mx, wy + 6);
+    setOrder(s, q, 'hold', mx, wy + 6);
     run(s, 27);
     expect(s.structs.includes(target)).toBe(true);
   });

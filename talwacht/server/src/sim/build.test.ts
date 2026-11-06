@@ -82,6 +82,6 @@ describe('building', () => {
   it('the game starts with the keep and the starting stock', () => {
     const s = fresh();
     expect(s.structs.filter(x => x.kind === 'keep').length).toBe(1);
-    expect(s.res).toEqual({ wood: 400, stone: 200, food: 150, gold: 300 });
+    expect(s.res).toEqual({ wood: 600, stone: 300, food: 150, gold: 400 });
   });
 });

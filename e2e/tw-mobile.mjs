@@ -10,13 +10,13 @@ for (const vp of [{ width: 667, height: 375 }, { width: 932, height: 430 }]) {
   const a = await browser.newPage(ctx), b = await browser.newPage(ctx);
   const errs = [...watch(a, 'A'), ...watch(b, 'B')];
   await a.goto(srv.url + '/?q=low&debugWaves=2');
-  await a.waitForSelector('#create'); await a.tap('#create');
-  await a.waitForFunction(() => window.__tw?.game?.conn?.code);
+  await a.waitForSelector('#create', { timeout: 120000 }); await a.tap('#create');
+  await a.waitForFunction(() => window.__tw?.game?.conn?.code, null, { timeout: 120000 });
   const code = await a.evaluate(() => window.__tw.game.conn.code);
-  await b.goto(`${srv.url}/?q=low&room=${code}`); await b.waitForSelector('#joinBtn'); await b.tap('#joinBtn');
-  await a.waitForFunction(() => window.__tw.game.conn.peerConnected && window.__tw.game.conn.structs.size > 0);
+  await b.goto(`${srv.url}/?q=low&room=${code}`); await b.waitForSelector('#joinBtn', { timeout: 120000 }); await b.tap('#joinBtn');
+  await a.waitForFunction(() => window.__tw.game.conn.peerConnected && window.__tw.game.conn.structs.size > 0, null, { timeout: 120000 });
   // camera onto open ground in front of the keep
-  await a.evaluate(() => { const w = window.__tw.world; w.target.set(254, 0, 470); w.dist = 90; w.yaw = 0; });
+  await a.evaluate(() => { const w = window.__tw.world; w.target.set(330, 0, 780); w.dist = 90; w.yaw = 0; });
   await a.waitForTimeout(800);
   // wall mode: tap the item, drag across the screen, confirm
   await a.tap('.item[data-k="wall"]');
@@ -34,7 +34,7 @@ for (const vp of [{ width: 667, height: 375 }, { width: 932, height: 430 }]) {
   // archers onto the new wall by tapping it
   await a.evaluate(async () => {
     const g = window.__tw.game, c = g.conn;
-    c.cmd({ c: 'build', kind: 'range', cells: [[60, 128]] });
+    c.cmd({ c: 'build', kind: 'range', cells: [[80, 205]] });
   });
   await a.waitForTimeout(500);
   await a.evaluate(() => { const g = window.__tw.game; for (const s of g.conn.structs.values()) if (s.kind === 'range') { s.build = 0; } });

@@ -21,10 +21,11 @@ describe('terrain', () => {
       });
 
       it('ground well outside the valley is a high cliff', () => {
-        const e = map.edges.reduce((a, b) => (Math.abs(b.y - 300) < Math.abs(a.y - 300) ? b : a));
-        const x = Math.max(2, e.left - 40);
-        expect(t.kind[t.cellAt(x, e.y)]).toBe(K.cliff);
-        expect(t.height(x, e.y)).toBeGreaterThan(20);
+        let x = 2;
+        while (x < map.w / 2 && t.outside(x + 4, 300) > 40) x += 4;
+        expect(t.outside(x, 300)).toBeGreaterThan(40);
+        expect(t.kind[t.cellAt(x, 300)]).toBe(K.cliff);
+        expect(t.height(x, 300)).toBeGreaterThan(20);
       });
 
       it('each lane start reaches the keep over passable cells', () => {

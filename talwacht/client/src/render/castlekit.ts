@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { DIRS, WALL_TOP, type StructId } from '@talwacht/shared';
+import { texSet, TRIPLANAR } from './textures';
 
 /**
  * Procedural castle kit. Every rampart cell = centre pier + one half-arm per connected neighbour (see shared/autotile),
@@ -19,6 +20,18 @@ const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Eule
 let seed = 1;
 const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
 
+/** surface family for the textured kit shader: 0 stone, 1 wood, 2 roof, 3 plain (iron, cloth, dark slits) */
+const MAT_OF = new Map<string, number>([
+  [KIT.stone, 0], [KIT.stoneDark, 0], [KIT.stoneTop, 0], [KIT.plinth, 0], [KIT.stone3, 0], [KIT.stone3Dark, 0],
+  [KIT.wood, 1], [KIT.woodDark, 1], [KIT.plank, 1], ['#7a5634', 1], ['#5e4128', 1], ['#8b6b4b', 1],
+  [KIT.roof, 2], [KIT.roofDark, 2],
+]);
+function tagMat(g: THREE.BufferGeometry, color: string) {
+  const id = MAT_OF.get(color) ?? 3;
+  g.setAttribute('kmat', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count).fill(id), 1));
+  return g;
+}
+
 /** box with flat colours (top a bit lighter, slight random tone per box) */
 export function box(w: number, h: number, d: number, x: number, y: number, z: number, color: string, ry = 0, jitter = 0.06, topColor?: string): THREE.BufferGeometry {
   const g = new THREE.BoxGeometry(w, h, d).toNonIndexed();
@@ -30,7 +43,7 @@ export function box(w: number, h: number, d: number, x: number, y: number, z: nu
   }
   g.setAttribute('color', new THREE.BufferAttribute(col, 3));
   g.applyMatrix4(_m.compose(new THREE.Vector3(x, y, z), _q.setFromEuler(_e.set(0, ry, 0)), new THREE.Vector3(1, 1, 1)));
-  return g;
+  return tagMat(g, color);
 }
 function cyl(rt: number, rb: number, h: number, x: number, y: number, z: number, color: string, seg = 8): THREE.BufferGeometry {
   const g = new THREE.CylinderGeometry(rt, rb, h, seg).toNonIndexed();
@@ -38,12 +51,41 @@ function cyl(rt: number, rb: number, h: number, x: number, y: number, z: number,
   for (let i = 0; i < col.length; i += 3) { col[i] = c.r; col[i + 1] = c.g; col[i + 2] = c.b; }
   g.setAttribute('color', new THREE.BufferAttribute(col, 3));
   g.translate(x, y, z);
-  return g;
+  return tagMat(g, color);
 }
 function cone(r: number, h: number, x: number, y: number, z: number, color: string, seg = 8) { return cyl(0.01, r, h, x, y, z, color, seg); }
 const merge = (gs: THREE.BufferGeometry[]) => { const g = mergeGeometries(gs, false)!; g.computeVertexNormals(); gs.forEach(x => x.dispose()); return g; };
 
 export const kitMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.88, metalness: 0, flatShading: true });
+{
+  const stone = texSet('castle_wall_slates'), wood = texSet('brown_planks_05'), roof = texSet('roof_slates_02');
+  kitMaterial.onBeforeCompile = sh => {
+    Object.assign(sh.uniforms, { tStone: { value: stone.map }, tWood: { value: wood.map }, tRoof: { value: roof.map } });
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute float kmat; varying float vKmat; varying vec3 vKP; varying vec3 vKN;')
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+vKmat = kmat;
+vec4 kp = vec4(position, 1.0); vec3 kn = normal;
+#ifdef USE_INSTANCING
+kp = instanceMatrix * kp; kn = mat3(instanceMatrix) * kn;
+#endif
+vKP = (modelMatrix * kp).xyz; vKN = normalize(mat3(modelMatrix) * kn);`);
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', `#include <common>
+uniform sampler2D tStone, tWood, tRoof; varying float vKmat; varying vec3 vKP; varying vec3 vKN;
+${TRIPLANAR}`)
+      .replace('#include <color_fragment>', `#include <color_fragment>
+{
+  vec3 n = normalize(vKN); float m = floor(vKmat + 0.5);
+  vec3 t = vec3(1.0);
+  if (m < 0.5) t = triSample(tStone, vKP, n, 0.42).rgb / max(textureLod(tStone, vec2(0.5), 12.0).rgb, vec3(0.05));
+  else if (m < 1.5) t = triSample(tWood, vKP, n, 0.35).rgb / max(textureLod(tWood, vec2(0.5), 12.0).rgb, vec3(0.05));
+  else if (m < 2.5) t = triSample(tRoof, vKP, n, 0.45).rgb / max(textureLod(tRoof, vec2(0.5), 12.0).rgb, vec3(0.05));
+  t = mix(vec3(dot(t, vec3(0.333))), t, 0.4);
+  diffuseColor.rgb *= clamp(t, 0.3, 1.9);
+}`);
+  };
+}
 
 /** is the arm's outer side (the one facing the enemy) on its left (+1) or right (-1)? */
 function outerSign(dx: number, dy: number, keepSide: number) {

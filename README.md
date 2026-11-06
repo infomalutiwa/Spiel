@@ -1,4 +1,31 @@
-# Burgwacht 🏰
+# Talwacht 🏰⛰️
+
+Das neue Koop-Burgverteidigungsspiel für zwei – im Browser, jede auf ihrem eigenen Handy (iPhone + Android), online per Code oder Link.
+Ihr baut eure Burg selbst hinten in einem natürlichen Tal, verschanzt euch Schicht für Schicht (Mauern, Tore, Türme, Fallen, Wirtschaft) und haltet 25–30 immer härtere Wellen, die **nur von vorn** kommen.
+Der Gegner-Kommandant lernt aus eurer Verteidigung: viele Schützen auf der Mauer → Schildkröten mit Rammbock; viele Fallen → Pioniere; starkes Tor → Leitern, Belagerungstürme, Mineure.
+
+## Talwacht starten
+
+```bash
+npm install
+npm run dev:tw          # Server (Port 2568) + Client (http://localhost:5174)
+```
+
+Eine öffnet die Seite und tippt **Spiel erstellen** → 4-Buchstaben-Code und Einladungslink. Die andere tritt mit dem Code bei.
+Für den Betrieb: `npm run start:tw` (baut den Client und startet alles auf einem Port, `PORT=8080`). Das Docker-Image und `render.yaml` starten Talwacht.
+
+**Steuerung (Handy):** ein Finger ziehen = Kamera · zwei Finger = Zoom/Drehen · Trupp antippen, dann Boden (hingehen), Gegner (angreifen), Mauer/Turm (Schützen verteilen sich auf die Zinnen), Tor (Nahkämpfer sperren, Reiter machen einen Ausfall) · Bau-Modus: Mauer mit dem Finger ziehen, ✔ · lange drücken = Markierung für die Mitspielerin.
+**Desktop:** Linksklick wählen/befehlen, Mausrad zoomen, WASD/Pfeile schwenken, Q/E drehen, Esc abbrechen.
+
+**Inhalt:** 4 Karten (Grüntal, Klamm, Flusstal, Winterpass), 10 Truppenarten in 5 Ausbildungsgebäuden, 5 Turmarten mit klaren Rollen (Bogen = schnell gegen Leichte, Armbrust = langsam/durchschlagend, Ballista = durchbohrt Reihen, Katapult = Fläche + sprengt Schildkröten, Pechnase = Konter am Tor), 9 Fallen, Wirtschaft (Holz, Stein, Nahrung, Gold, Unterhalt), Schmiede-Forschung, Bosse, Nacht- und Regenwellen, Sterne, Freischaltungen und Talente, Spielstand fortsetzen.
+
+**Grafik:** prozeduraler Burgbaukasten mit Poly-Haven-PBR-Texturen (CC0), Fotoboden mit Gras/Weg/Fels/Waldboden-Mischung, HDRI-Himmel, Poly-Haven-Felsen (mit `tools/blender/decimate.py` in Blender auf 1 500 Dreiecke reduziert), KayKit-Figuren (CC0, über `tools/bake` gebacken).
+
+**Tests:** `npx vitest run talwacht` (Simulation, Bauregeln, Wegfindung, Türme/Fallen, Belagerung, Kommandant, Netzwerk, Spielstände, Rollen-Benchmark) · `npm run build:tw` und dann `node e2e/tw-play.mjs <ordner>` (zwei Handys spielen) bzw. `node e2e/tw-mobile.mjs <ordner>` (Touch-Bau + Knopfgrößen bei 667×375 und 932×430) · `npx tsx talwacht/server/scripts/roles.ts` (Turm-Rollen-Matrix).
+
+---
+
+# Burgwacht 🏰 (das ältere Spiel, `npm run dev` / `npm run start:bw`)
 
 Ein kooperatives 3D-Festungsspiel für zwei – gespielt im Browser (Handy, Tablet oder Rechner), jede auf ihrem eigenen Gerät.
 Die Angreifer kommen über **eine** Straße zum Tor eurer Festung. Ihr stellt **Trupps** auf die Mauerkrone und ans Tor, baut die Mauern aus,

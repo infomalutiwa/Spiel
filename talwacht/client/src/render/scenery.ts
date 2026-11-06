@@ -23,9 +23,11 @@ export class Instancer {
       const mesh = o as THREE.Mesh;
       if (!mesh.isMesh) return;
       const mat = (mesh.material as THREE.MeshStandardMaterial).clone();
-      if (/leaf/i.test(mat.name)) mat.color.multiplyScalar(this.shadow ? 0.8 : 0.66);
+      if (/leaf/i.test(mat.name)) { mat.color.set('#3f7a35').lerp(mat.color, 0.25).multiplyScalar(this.shadow ? 0.95 : 0.8); mat.envMapIntensity = 0.35; }
+      if (/wood|bark/i.test(mat.name)) mat.color.set('#6b4a32');
       if (this.tint && /leaf|grass/i.test(mat.name)) mat.color.multiply(this.tint);
       if (this.rock && /dirt|stone/i.test(mat.name)) mat.color.set(this.rock);
+      if (this.rock && /grass/i.test(mat.name)) mat.color.set('#557f36');
       const local = base.clone().multiply(mesh.matrixWorld);
       const im = new THREE.InstancedMesh(mesh.geometry, mat, this.items.length);
       this.items.forEach((it, i) => {
@@ -50,7 +52,9 @@ export async function buildScenery(t: Terrain, parent: THREE.Object3D) {
     : [new Instancer(group, 'tree_pineTallA', 13, shadow), new Instancer(group, 'tree_pineRoundC', 10, shadow), new Instancer(group, 'tree_oak', 10, shadow), new Instancer(group, 'tree_default', 9, shadow), new Instancer(group, 'tree_fat', 9, shadow, m.theme === 'gorge' ? autumn : undefined)];
   const trees = treeSet(true), farTrees = treeSet(false);
   const grey = snow ? '#8d96a3' : '#8b847a';
-  const rocks = [new Instancer(group, 'rock_largeA', 2.6, true, undefined, grey), new Instancer(group, 'rock_largeC', 3, true, undefined, grey), new Instancer(group, 'stone_largeA', 2.2, true, undefined, grey), new Instancer(group, 'stone_largeB', 2.4, true, undefined, grey)];
+  // photo-scanned Poly Haven boulder (decimated in Blender, tools/blender/decimate.py) in a few sizes
+  const rocks = [new Instancer(group, 'ph_boulder', 2.2), new Instancer(group, 'ph_boulder', 3.2), new Instancer(group, 'ph_boulder', 1.5)];
+  void grey;
   const bushes = snow ? [] : [new Instancer(group, 'plant_bushLarge', 2.2, false), new Instancer(group, 'plant_bush', 1.6, false)];
   const flowers = snow ? [] : [new Instancer(group, 'flower_yellowA', 0.9, false), new Instancer(group, 'flower_redA', 0.9, false), new Instancer(group, 'flower_purpleA', 0.9, false)];
   const pick = <T,>(a: T[]) => a[Math.floor(R() * a.length)];

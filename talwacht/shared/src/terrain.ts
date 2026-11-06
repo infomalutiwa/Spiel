@@ -14,6 +14,8 @@ export interface Terrain extends GridLike {
   height(x: number, y: number): number;
   /** metres outside the valley floor (negative = inside) */
   outside(x: number, y: number): number;
+  /** 0..1 rock crag inside the valley */
+  crag(x: number, y: number): number;
   left(y: number): number;
   right(y: number): number;
   cellAt(x: number, y: number): number;
@@ -29,7 +31,24 @@ export function buildTerrain(map: MapDef): Terrain {
   const ys = map.edges.map(e => e.y), ls = map.edges.map(e => e.left), rs = map.edges.map(e => e.right);
   const left = (y: number) => spline(ys, ls, y) + (fbm(y * 0.012, 3.1, map.seed) - 0.5) * 22 + (noise2(y * 0.05, 9, map.seed) - 0.5) * 6;
   const right = (y: number) => spline(ys, rs, y) + (fbm(y * 0.012, 7.7, map.seed + 1) - 0.5) * 22 + (noise2(y * 0.05, 2, map.seed + 1) - 0.5) * 6;
-  const outside = (x: number, y: number) => Math.max(left(y) - x, x - right(y), y - map.backY - (fbm(x * 0.03, 1, map.seed) - 0.5) * 10);
+  const valleyOut = (x: number, y: number) => Math.max(left(y) - x, x - right(y), y - map.backY - (fbm(x * 0.03, 1, map.seed) - 0.5) * 10);
+  const outside = (x: number, y: number) => {
+    let o = valleyOut(x, y);
+    for (const [bx, by, r] of map.basins) {
+      const d = Math.hypot(x - bx, y - by) - r * (0.85 + 0.3 * fbm(Math.atan2(y - by, x - bx) * 2 + 7, 3, map.seed + 4));
+      if (d < o) o = d;
+    }
+    return o;
+  };
+  /** 0..1: how much (x, y) belongs to a rock crag inside the valley */
+  const crag = (x: number, y: number) => {
+    let k = 0;
+    for (const [cx, cy, r] of map.crags) {
+      const rr = r * (0.8 + 0.4 * fbm(Math.atan2(y - cy, x - cx) * 1.6 + 3, 1, map.seed + 8));
+      k = Math.max(k, smooth(rr * 1.35, rr * 0.7, Math.hypot(x - cx, y - cy)));
+    }
+    return k;
+  };
   const creekW = map.creekWidth ?? 6;
 
   const height = (x: number, y: number) => {
@@ -43,6 +62,10 @@ export function buildTerrain(map: MapDef): Terrain {
       h += face * smooth(-6, 6, out) + (fbm(x * 0.07, y * 0.07, map.seed + 5) - 0.5) * Math.min(14, o * 0.7)
         + (noise2(x * 0.22, y * 0.22, map.seed + 6) - 0.5) * Math.min(3.5, o * 0.4); // craggy rock face
       if (o > 16) h += (fbm(x * 0.012, y * 0.012, map.seed + 9) - 0.3) * 22 * smooth(16, 40, o); // rolling ridge tops
+    }
+    for (const [cx, cy, r, ch] of map.crags) {
+      const d = Math.hypot(x - cx, y - cy);
+      if (d < r * 1.5) h += ch * smooth(r * 1.5, r * 0.55, d) + (fbm(x * 0.15, y * 0.15, map.seed + 12) - 0.5) * 5 * smooth(r * 1.4, r * 0.6, d);
     }
     if (map.creek) {
       const c = polyDist(x, y, map.creek).d;
@@ -66,12 +89,12 @@ export function buildTerrain(map: MapDef): Terrain {
     if (water) k = K.water;
     const road = map.lanes.some(l => polyDist(x, y, l.pts).d < 3.6);
     if (road) { if (water) bridge[i] = 1; k = K.road; }
-    if (out > 3 || y > map.backY + 3) k = K.cliff;
+    if (out > 3 || y > map.backY + 3 || crag(x, y) > 0.55) k = K.cliff;
     kind[i] = k;
   }
 
   const t: Terrain = {
-    map, cw, ch, kind, bridge, height, outside, left, right,
+    map, cw, ch, kind, bridge, height, outside, crag, left, right,
     cellAt: (x, y) => Math.min(ch - 1, Math.max(0, Math.floor(y / CELL))) * cw + Math.min(cw - 1, Math.max(0, Math.floor(x / CELL))),
     passable: c => kind[c] !== K.cliff && kind[c] !== K.water,
     buildable: c => kind[c] !== K.cliff && kind[c] !== K.water,

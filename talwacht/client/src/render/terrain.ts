@@ -8,7 +8,7 @@ const PAL: Record<MapDef['theme'], Palette> = {
   green: { g1: '#6f9f45', g2: '#8fb553', meadow: '#a9c65c', road: '#c4ab80', road2: '#a99070', forest: '#5d8a3a', rock: '#7c766d', rock2: '#9d958a', top: '#6d9a42', shore: '#c9b98a', water: '#3f8fbf' },
   gorge: { g1: '#7aa24a', g2: '#98b958', meadow: '#b0c862', road: '#c0a47c', road2: '#a68c6c', forest: '#5a8238', rock: '#85776a', rock2: '#a5968a', top: '#6a8f40', shore: '#c4b28a', water: '#3d88b6' },
   river: { g1: '#6a9f44', g2: '#8cb655', meadow: '#a8c860', road: '#c4ab80', road2: '#a99070', forest: '#57873a', rock: '#7a756e', rock2: '#9c968c', top: '#689a42', shore: '#cdbd8e', water: '#3a92c4' },
-  snow: { g1: '#e6eef5', g2: '#d3dfea', meadow: '#dfe9f1', road: '#c8b9a6', road2: '#ad9c88', forest: '#c3d1dc', rock: '#7f8996', rock2: '#9aa4b0', top: '#e9f0f6', shore: '#c9d5df', water: '#5b9fcb' },
+  snow: { g1: '#c9d3dc', g2: '#bcc8d3', meadow: '#c4cfd9', road: '#c8b9a6', road2: '#ad9c88', forest: '#aebdc9', rock: '#6f7884', rock2: '#8b95a1', top: '#cdd6df', shore: '#b6c3cf', water: '#5b9fcb' },
 };
 
 /** visible extent: the playable map plus scenery margins (approach in front, ridges at the sides and back) */
@@ -31,15 +31,21 @@ export function buildTerrainMesh(t: Terrain): THREE.Mesh {
     const n = fbm(x * 0.045, y * 0.045, m.seed + 21), n2 = fbm(x * 0.15, y * 0.15, m.seed + 7);
     c.copy(C('g1')).lerp(b.set(P.g2), n * 0.9 + n2 * 0.2);
     const inMap = x >= 0 && y >= 0 && x < m.w && y < m.d;
-    const kind = inMap ? t.kind[t.cellAt(x, y)] : K.grass;
     let wr = 0, wk = 0, wf = 0;
-    if (kind === K.meadow) c.lerp(C('meadow'), 0.55 + n2 * 0.3);
-    if (kind === K.forest) { c.lerp(C('forest'), 0.7); wf = 0.75; }
-    if (kind === K.rock) { c.lerp(C('rock2'), 0.5 + n2 * 0.3); wk = 0.5; }
+    // soft, ragged patches (not the 4-m cells) so meadows and woods have natural edges
+    const blob = (list: [number, number, number][]) => { let k = 0; for (const [bx, by, r] of list) { const rr = r * (0.75 + 0.5 * n); k = Math.max(k, smooth(rr * 1.15, rr * 0.7, Math.hypot(x - bx, y - by))); } return k; };
+    const mk = blob(m.meadows), fk = blob(m.forests), rk = blob(m.rocks);
+    if (mk) c.lerp(C('meadow'), mk * (0.5 + n2 * 0.3));
+    if (fk) { c.lerp(C('forest'), fk * 0.7); wf = fk * 0.75; }
+    if (rk) { c.lerp(C('rock2'), rk * (0.5 + n2 * 0.3)); wk = rk * 0.5; }
+    const ck = t.crag(x, y);
+    if (ck) { c.lerp(b.set(P.rock).lerp(a.set(P.rock2), n2), ck); wk = Math.max(wk, ck); }
+    void inMap;
     // roads (also continue out of the map towards the enemy)
-    let road = 99;
-    for (const l of m.lanes) road = Math.min(road, polyDist(x, y, y < 0 ? [[l.pts[0][0], -400], ...l.pts] : l.pts).d);
-    if (road < 3.6 && out < 0) { const k = smooth(3.6, 1.6, road) * (0.75 + n2 * 0.25); c.lerp(C('road'), k).lerp(b.set(P.road2), n2 * 0.6 * k); wr = Math.max(wr, k); }
+    // the main road is a broad track, side lanes are narrow footpaths
+    let road = 99, side = false;
+    for (const l of m.lanes) { const d = polyDist(x, y, y < 0 ? [[l.pts[0][0], -400], ...l.pts] : l.pts).d * (l.id ? 1.6 : 1); if (d < road) { road = d; side = l.id !== 0; } }
+    if (road < 3.6 && out < 0) { const k = smooth(3.6, 1.6, road) * (0.75 + n2 * 0.25) * (side ? 0.55 : 1); c.lerp(C('road'), k).lerp(b.set(P.road2), n2 * 0.6 * k); wr = Math.max(wr, k); }
     if (m.creek) {
       const cd = polyDist(x, y, m.creek).d, w = (m.creekWidth ?? 6) / 2;
       if (cd < w + 3 && out < 0) { c.lerp(C('shore'), smooth(w + 3, w, cd) * 0.8); wr = Math.max(wr, smooth(w + 3, w, cd) * 0.7); }
@@ -61,8 +67,7 @@ export function buildTerrainMesh(t: Terrain): THREE.Mesh {
     const wg = Math.max(0, 1 - wk - wr - wf);
     spl.set([wg, wr, wk, wf], i * 4);
     a.setRGB(0, 0, 0).add(b.copy(BASE.g).multiplyScalar(wg)).add(b.copy(BASE.r).multiplyScalar(wr)).add(b.copy(BASE.k).multiplyScalar(wk)).add(b.copy(BASE.f).multiplyScalar(wf));
-    const tint = (v: number, base: number) => Math.min(1.5, Math.max(0.45, v / Math.max(0.02, base)));
-    col[i * 3] = tint(c.r, a.r); col[i * 3 + 1] = tint(c.g, a.g); col[i * 3 + 2] = tint(c.b, a.b);
+    col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
   }
   const idx: number[] = [];
   for (let iy = 0; iy < ny; iy++) for (let ix = 0; ix < nx; ix++) {
@@ -92,23 +97,27 @@ function terrainMaterial(theme: MapDef['theme']) {
   mat.onBeforeCompile = sh => {
     Object.assign(sh.uniforms, {
       tGrass: { value: T.grass.map }, tRoad: { value: T.road.map }, tRock: { value: T.rock.map }, tForest: { value: T.forest.map },
-      tGrassN: { value: T.grass.normal }, tRoadN: { value: T.road.normal },
+      tGrassN: { value: T.grass.normal }, tRoadN: { value: T.road.normal }, snowTheme: { value: snow },
     });
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nattribute vec4 splat; varying vec4 vSplat; varying vec3 vWP; varying vec3 vWN;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSplat = splat; vWP = (modelMatrix * vec4(position, 1.0)).xyz; vWN = normalize(mat3(modelMatrix) * normal);');
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
-uniform sampler2D tGrass, tRoad, tRock, tForest, tGrassN, tRoadN; varying vec4 vSplat; varying vec3 vWP; varying vec3 vWN;
+uniform sampler2D tGrass, tRoad, tRock, tForest, tGrassN, tRoadN; uniform bool snowTheme; varying vec4 vSplat; varying vec3 vWP; varying vec3 vWN;
 ${TRIPLANAR}`)
       .replace('#include <map_fragment>', `
 vec3 wn = normalize(vWN);
-vec3 grass = mix(texture2D(tGrass, vWP.xz * 0.11).rgb, texture2D(tGrass, vWP.xz * 0.027 + 0.37).rgb, 0.45);
-vec3 road = texture2D(tRoad, vWP.xz * 0.16).rgb;
-vec3 forest = texture2D(tForest, vWP.xz * 0.09).rgb;
-vec3 rock = triSample(tRock, vWP, wn, 0.06).rgb;
+// photo textures as luminance detail on top of the painted colour (keeps the art direction, adds real surface)
+#define DET(t, c) (c / max(textureLod(t, vec2(0.5), 12.0).rgb, vec3(0.04)))
+vec3 grass = mix(DET(tGrass, texture2D(tGrass, vWP.xz * 0.11).rgb), DET(tGrass, texture2D(tGrass, vWP.xz * 0.027 + 0.37).rgb), 0.4);
+vec3 road = DET(tRoad, texture2D(tRoad, vWP.xz * 0.16).rgb);
+vec3 forest = DET(tForest, texture2D(tForest, vWP.xz * 0.09).rgb);
+vec3 rock = DET(tRock, triSample(tRock, vWP, wn, 0.06).rgb);
 vec4 w = vSplat / max(0.001, vSplat.x + vSplat.y + vSplat.z + vSplat.w);
-diffuseColor.rgb *= (grass * w.x + road * w.y + rock * w.z + forest * w.w) * 1.25;`)
+vec3 det = grass * w.x + road * w.y + rock * w.z + forest * w.w;
+det = mix(vec3(dot(det, vec3(0.333))), det, 0.35); // mostly brightness, a little hue
+diffuseColor.rgb *= clamp(det, 0.35, snowTheme ? 1.15 : 1.8);`)
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
 { vec3 gn = texture2D(tGrassN, vWP.xz * 0.11).xyz * 2.0 - 1.0; vec3 rn = texture2D(tRoadN, vWP.xz * 0.16).xyz * 2.0 - 1.0;
   vec3 tn = mix(gn, rn, w.y) * (1.0 - w.z);
@@ -122,7 +131,14 @@ diffuseColor.rgb *= (grass * w.x + road * w.y + rock * w.z + forest * w.w) * 1.2
 export function buildWater(t: Terrain): THREE.Mesh | null {
   const m = t.map;
   if (!m.creek) return null;
-  const pts = m.creek, w = (m.creekWidth ?? 6) / 2 + 1.2;
+  // smooth the bends (Chaikin) so the creek flows instead of zig-zagging
+  let pts: [number, number][] = m.creek;
+  for (let it = 0; it < 3; it++) {
+    const out: [number, number][] = [pts[0]];
+    for (let i = 0; i + 1 < pts.length; i++) { const [ax, ay] = pts[i], [bx, by] = pts[i + 1]; out.push([ax * 0.75 + bx * 0.25, ay * 0.75 + by * 0.25], [ax * 0.25 + bx * 0.75, ay * 0.25 + by * 0.75]); }
+    out.push(pts[pts.length - 1]); pts = out;
+  }
+  const w = (m.creekWidth ?? 6) / 2 + 1.2;
   // resample the polyline every 3 m
   const samp: [number, number][] = [];
   for (let i = 0; i + 1 < pts.length; i++) {

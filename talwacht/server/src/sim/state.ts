@@ -63,7 +63,7 @@ export function createGame(mapId: string, diff: Difficulty, seed: number, talent
   const d = DIFFICULTY[diff];
   const s: GameState = {
     v: SAVE_VERSION, mapId: map.id, diff, seed, rngState: seed >>> 0, tick: 0, time: 0, phase: 'play',
-    res: res(Math.round(400 * d.res), Math.round(200 * d.res), Math.round(150 * d.res), Math.round(300 * d.res)), spent: [],
+    res: res(Math.round(600 * d.res), Math.round(300 * d.res), Math.round(150 * d.res), Math.round(400 * d.res)), spent: [],
     talents: talents.slice(0, 3), unlocks: [...unlocks], research: [],
     structs: [], units: [], squads: [], formations: [], shells: [], groups: [],
     nextId: 1, sRev: 0,

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
+import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js';
 
 /** CC0 PBR texture sets from Poly Haven (1k jpg: diffuse, OpenGL normal, AO/roughness/metal) */
 export interface TexSet { map: THREE.Texture; normal: THREE.Texture; arm: THREE.Texture }
@@ -24,11 +24,11 @@ export function texSet(id: string): TexSet {
 
 /** equirect HDR sky: image-based light for every material plus the visible backdrop */
 export function loadSky(renderer: THREE.WebGLRenderer, scene: THREE.Scene, onDone?: () => void) {
-  new RGBELoader().load(ROOT + 'sky_1k.hdr', hdr => {
+  new HDRLoader().load(ROOT + 'sky_1k.hdr', hdr => {
     hdr.mapping = THREE.EquirectangularReflectionMapping;
     const pm = new THREE.PMREMGenerator(renderer);
     scene.environment = pm.fromEquirectangular(hdr).texture;
-    scene.environmentIntensity = 0.55;
+    scene.environmentIntensity = 0.35;
     scene.background = hdr;
     scene.backgroundIntensity = 0.95;
     pm.dispose();

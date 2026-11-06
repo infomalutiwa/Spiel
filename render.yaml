@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: burgwacht
+    name: talwacht
     runtime: docker
     plan: free
     healthCheckPath: /healthz
