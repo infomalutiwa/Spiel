@@ -158,3 +158,5 @@ body.rain #c { filter: saturate(.75) brightness(.92); }
 .codex .ce .ic { font-size: 20px; width: 26px; text-align: center; }
 .codex .ce p { margin: 2px 0 0; font-size: 12px; opacity: .88; }
 .codex .ce small { opacity: .75; }
+/* the start buttons stay visible at the bottom of the lobby card on short (landscape) phones */
+#lobby .go { position: sticky; bottom: -16px; z-index: 2; background: linear-gradient(#2a1f1500, #2a1f15f2 30%); padding: 10px 0 8px; margin-bottom: -8px; }

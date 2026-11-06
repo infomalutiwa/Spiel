@@ -26,12 +26,14 @@ export interface Terrain extends GridLike {
 }
 
 const CLIFF_H = 64;
+/** behind the keep the ground stays open for a while and then rises gently, so the camera (which looks from behind) never sinks into a hill */
+const BACK_GAP = 120, BACK_SLOPE = 0.35;
 
 export function buildTerrain(map: MapDef): Terrain {
   const ys = map.edges.map(e => e.y), ls = map.edges.map(e => e.left), rs = map.edges.map(e => e.right);
   const left = (y: number) => spline(ys, ls, y) + (fbm(y * 0.012, 3.1, map.seed) - 0.5) * 22 + (noise2(y * 0.05, 9, map.seed) - 0.5) * 6;
   const right = (y: number) => spline(ys, rs, y) + (fbm(y * 0.012, 7.7, map.seed + 1) - 0.5) * 22 + (noise2(y * 0.05, 2, map.seed + 1) - 0.5) * 6;
-  const valleyOut = (x: number, y: number) => Math.max(left(y) - x, x - right(y), y - map.backY - (fbm(x * 0.03, 1, map.seed) - 0.5) * 10);
+  const valleyOut = (x: number, y: number) => Math.max(left(y) - x, x - right(y), (y - map.backY - BACK_GAP - (fbm(x * 0.03, 1, map.seed) - 0.5) * 10) * BACK_SLOPE);
   const outside = (x: number, y: number) => {
     let o = valleyOut(x, y);
     for (const [bx, by, r] of map.basins) {

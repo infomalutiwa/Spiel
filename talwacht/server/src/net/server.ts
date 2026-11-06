@@ -79,7 +79,7 @@ wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
       let room: Room | { error: string } | undefined;
       if (msg?.t === 'create') {
         if (!mayCreate(ip)) return err('too_many_rooms');
-        room = rooms.create({ mapId: String(msg.mapId), diff: msg.diff, talents: msg.talents, unlocks: msg.unlocks, save: typeof msg.save === 'string' ? msg.save : undefined, debugWaves: Number(msg.debugWaves) || undefined });
+        room = rooms.create({ mapId: String(msg.mapId), diff: msg.diff, talents: msg.talents, unlocks: msg.unlocks, save: typeof msg.save === 'string' ? msg.save : undefined, debugWaves: Number(msg.debugWaves) || undefined, solo: msg.solo === true });
       } else if (msg?.t === 'join') {
         room = typeof msg.code === 'string' ? rooms.get(msg.code) : undefined;
         if (!room) return err('room_not_found');

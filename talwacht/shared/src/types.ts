@@ -130,6 +130,8 @@ export interface GameState {
   result: GameResult | null;
   /** debug: total waves override (tests, ?debugWaves) */
   debugWaves?: number;
+  /** one player alone: no waiting for a partner, both starting garrisons belong to player 0 */
+  solo?: boolean;
 }
 
 export type GameEvent =
@@ -188,12 +190,12 @@ export type Command =
   | { c: 'preview'; kind: StructId | null; cells: [number, number][] };
 
 export type ClientMsg =
-  | { t: 'create'; mapId: string; diff: Difficulty; talents: TalentId[]; unlocks: string[]; save?: string; debugWaves?: number }
+  | { t: 'create'; mapId: string; diff: Difficulty; talents: TalentId[]; unlocks: string[]; save?: string; debugWaves?: number; solo?: boolean }
   | { t: 'join'; code: string; token?: string }
   | { t: 'cmd'; cmd: Command }
   | { t: 'vis'; hidden: boolean };
 export type ServerMsg =
-  | { t: 'joined'; code: string; you: PlayerId; token: string; mapId: string; v: number }
+  | { t: 'joined'; code: string; you: PlayerId; token: string; mapId: string; v: number; solo?: boolean }
   | { t: 'peer'; connected: boolean }
   | { t: 'snap'; s: WireSnapshot }
   | { t: 'save'; data: string; wave: number; mapId: string }

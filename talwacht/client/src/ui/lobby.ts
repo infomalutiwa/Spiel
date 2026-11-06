@@ -5,7 +5,7 @@ import { reasonText } from './hud';
 const esc = (s: string) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
 export interface LobbyActions {
-  create(map: string, diff: Difficulty): Promise<void>;
+  create(map: string, diff: Difficulty, solo?: boolean): Promise<void>;
   join(code: string): Promise<void>;
   resume(save: string): Promise<void>;
   preview(map: string): void;
@@ -31,14 +31,14 @@ export function showLobby(meta: Meta, act: LobbyActions, preset?: string) {
       return `<button class="tal ${on ? 'on' : ''} ${open ? '' : 'locked'}" data-tal="${t.id}" ${open ? '' : 'disabled'} title="${esc(t.blurb)}"><b>${esc(t.name)}</b><small>${open ? esc(t.blurb) : `🔒 ${t.stars} ⭐`}</small></button>`;
     }).join('');
     el.innerHTML = `<div class="card panel">
-      <h1>Talwacht</h1><p class="sub">Verschanzt euch zu zweit im Tal – haltet ${DIFFICULTY[meta.diff].waves} Wellen. ⭐ ${stars}</p>
+      <h1>Talwacht</h1><p class="sub">Verschanzt euch im Tal – allein oder zu zweit. Haltet ${DIFFICULTY[meta.diff].waves} Wellen. ⭐ ${stars}</p>
       <div class="tabs3"><button class="seg ${tab === 'new' ? 'on' : ''}" data-tab="new">🏰 Neues Spiel</button><button class="seg ${tab === 'join' ? 'on' : ''}" data-tab="join">🤝 Beitreten</button><button class="seg ${tab === 'more' ? 'on' : ''}" data-tab="more">⭐ Fortschritt</button></div>
       ${tab === 'new' ? `
         <div class="maps">${maps}</div>
         <div class="segs">${diffs}</div>
         <div class="tals"><div class="hint">Talente (bis zu 3):</div>${talents}</div>
-        <div class="go"><button class="btn gold big" id="create">Spiel erstellen</button>${saved ? `<button class="btn" id="resume">↻ Fortsetzen: ${esc(MAPS[saved.mapId]?.name ?? '')}, Welle ${saved.wave}</button>` : ''}</div>
-        <p class="hint">Du bekommst einen Code. Deine Mitspielerin tritt damit bei – jede auf ihrem eigenen Handy.</p>` : ''}
+        <div class="go"><button class="btn gold big" id="create">🤝 Zu zweit spielen</button><button class="btn big" id="solo">🛡️ Solo spielen</button>${saved ? `<button class="btn" id="resume">↻ Fortsetzen: ${esc(MAPS[saved.mapId]?.name ?? '')}, Welle ${saved.wave}</button>` : ''}</div>
+        <p class="hint">Zu zweit: Du bekommst einen Code, deine Mitspielerin tritt damit bei – jede auf ihrem eigenen Handy. Solo: Du verteidigst das Tal allein und führst alle Truppen.</p>` : ''}
       ${tab === 'join' ? `
         <div class="join"><input id="code" maxlength="4" placeholder="CODE" value="${esc(preset ?? '')}" autocomplete="off" autocapitalize="characters"><button class="btn gold big" id="joinBtn">Beitreten</button></div>
         <p class="hint">Den 4-stelligen Code zeigt das Handy, auf dem das Spiel erstellt wurde.</p>` : ''}
@@ -53,6 +53,7 @@ export function showLobby(meta: Meta, act: LobbyActions, preset?: string) {
     el.querySelectorAll<HTMLElement>('[data-tal]').forEach(b => b.onclick = () => { toggleTalent(meta, b.dataset.tal as never); render(); });
     const busy = async (fn: () => Promise<void>) => { el.querySelectorAll('button').forEach(b => (b.disabled = true)); try { await fn(); el.remove(); } catch (e) { render(reasonText((e as Error).message)); } };
     el.querySelector('#create')?.addEventListener('click', () => busy(() => act.create(meta.map, meta.diff)));
+    el.querySelector('#solo')?.addEventListener('click', () => busy(() => act.create(meta.map, meta.diff, true)));
     el.querySelector('#resume')?.addEventListener('click', () => busy(() => act.resume(loadRound()!.data)));
     const code = el.querySelector<HTMLInputElement>('#code');
     const join = () => busy(() => act.join((code?.value ?? '').trim().toUpperCase()));

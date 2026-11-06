@@ -119,7 +119,7 @@ function wire(conn: Connection) {
     for (const e of s.events) if (e.k === 'wave') audio.play('horn', 0.8);
   };
   conn.onError = r => g.hud.toast(reasonText(r), true);
-  conn.onPeer = p => { if (!p) g.hud.toast('Deine Mitspielerin hat die Verbindung verloren', true); else g.hud.toast('💗 Deine Mitspielerin ist da!'); };
+  conn.onPeer = p => { if (conn.solo) return; if (!p) g.hud.toast('Deine Mitspielerin hat die Verbindung verloren', true); else g.hud.toast('💗 Deine Mitspielerin ist da!'); };
   conn.onSave = (data, wave, mapId) => storeRound({ data, wave, mapId, at: Date.now() });
   conn.onClose = () => reconnect(conn.code);
 }
@@ -210,7 +210,7 @@ if (params.get('gallery') === 'units') {
   const debugWaves = Number(params.get('debugWaves')) || undefined;
   showLobby(meta, {
     preview: id => { void loadMap(id); },
-    create: async (map, diff) => enter(await Connection.open({ mapId: map, diff, talents: meta.talents, unlocks: unlocks(meta), debugWaves })),
+    create: async (map, diff, solo) => enter(await Connection.open({ mapId: map, diff, talents: meta.talents, unlocks: unlocks(meta), debugWaves, solo })),
     join: async code => { if (code.length !== 4) throw new Error('room_not_found'); await enter(await Connection.open({ code })); },
     resume: async save => enter(await Connection.open({ mapId: meta.map, diff: meta.diff, talents: meta.talents, unlocks: unlocks(meta), save })),
   }, params.get('room')?.toUpperCase());

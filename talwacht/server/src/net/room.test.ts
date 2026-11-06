@@ -26,6 +26,19 @@ describe('room', () => {
     expect(r.paused).toBe(false);
   });
 
+  it('solo: runs with one player, owns every starting squad, keeps solo across a save', () => {
+    const r = Room.create('SOLO', { ...opts, solo: true }) as Room;
+    const a = new FakeSocket();
+    r.join(a);
+    expect(r.paused).toBe(false);
+    expect(a.last('joined')!.solo).toBe(true);
+    expect(r.state.squads.length).toBe(4);
+    expect(r.state.squads.every(q => q.owner === 0)).toBe(true);
+    const back = Room.create('SOL2', { ...opts, save: serialize(r.state) }) as Room;
+    back.join(new FakeSocket());
+    expect(back.paused).toBe(false);
+  });
+
   it('a third player is turned away', () => {
     const r = Room.create('ABCE', opts) as Room;
     r.join(new FakeSocket()); r.join(new FakeSocket());

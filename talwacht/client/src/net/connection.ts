@@ -1,7 +1,7 @@
 import { fromWire, type ClientMsg, type Command, type Difficulty, type PlayerId, type ServerMsg, type Snapshot, type StructSnap, type TalentId } from '@talwacht/shared';
 
 export interface Timed { at: number; snap: Snapshot }
-export interface CreateOpts { mapId: string; diff: Difficulty; talents: TalentId[]; unlocks: string[]; save?: string; debugWaves?: number }
+export interface CreateOpts { mapId: string; diff: Difficulty; talents: TalentId[]; unlocks: string[]; save?: string; debugWaves?: number; solo?: boolean }
 
 /** WebSocket wrapper: buffers snapshots for interpolation and keeps the full structure list up to date */
 export class Connection {
@@ -9,6 +9,7 @@ export class Connection {
   code = '';
   mapId = 'gruental';
   peerConnected = false;
+  solo = false;
   snaps: Timed[] = [];
   structs = new Map<number, StructSnap>();
   structRev = -1;
@@ -43,7 +44,7 @@ export class Connection {
         const m: ServerMsg = JSON.parse(ev.data);
         switch (m.t) {
           case 'joined':
-            c.you = m.you; c.code = m.code; c.mapId = m.mapId;
+            c.you = m.you; c.code = m.code; c.mapId = m.mapId; c.solo = !!m.solo;
             try { sessionStorage.setItem(`tw-token-${m.code}`, m.token); } catch { /* private mode */ }
             settled = true; resolve(c);
             break;

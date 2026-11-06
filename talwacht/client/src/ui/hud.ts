@@ -285,7 +285,7 @@ export class Hud {
     const o = this.els.overlay;
     if (s.paused && !s.result) {
       o.classList.remove('hidden');
-      o.innerHTML = this.conn.peerConnected ? '<div class="panel msg">⏸️ Pause – deine Mitspielerin hat das Spiel gerade nicht offen</div>' : `<div class="panel msg">⏳ Warte auf deine Mitspielerin …<br>Code <b class="code">${esc(this.conn.code)}</b><br><button class="btn gold" id="share">🔗 Einladung teilen</button></div>`;
+      o.innerHTML = this.conn.solo ? '<div class="panel msg">⏸️ Pause</div>' : this.conn.peerConnected ? '<div class="panel msg">⏸️ Pause – deine Mitspielerin hat das Spiel gerade nicht offen</div>' : `<div class="panel msg">⏳ Warte auf deine Mitspielerin …<br>Code <b class="code">${esc(this.conn.code)}</b><br><button class="btn gold" id="share">🔗 Einladung teilen</button></div>`;
       o.querySelector('#share')?.addEventListener('click', () => shareInvite(this.conn.code));
     } else o.classList.add('hidden');
     document.body.classList.toggle('rain', s.rain);

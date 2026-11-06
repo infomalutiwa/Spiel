@@ -6,7 +6,7 @@ import { trapSpent } from '../sim/traps';
 import { applyCommand, armyCap, createGame, starterBase, deserialize, rate, serialize, soldiers, tick, timeline } from '../sim/index';
 
 export interface Socket { send(data: string): void; close(): void }
-export interface RoomOpts { mapId: string; diff: Difficulty; talents: TalentId[]; unlocks: string[]; save?: string; debugWaves?: number }
+export interface RoomOpts { mapId: string; diff: Difficulty; talents: TalentId[]; unlocks: string[]; save?: string; debugWaves?: number; solo?: boolean }
 
 const TICK_MS = 50;
 const SNAP_EVERY = 2;
@@ -38,13 +38,14 @@ export class Room {
     const talents = (Array.isArray(o.talents) ? o.talents : []).filter(t => TALENTS.some(x => x.id === t)).slice(0, 3);
     const unlocks = (Array.isArray(o.unlocks) ? o.unlocks : []).filter(u => UNLOCKS.some(x => x.id === u));
     const s = createGame(map, diff, (Math.random() * 2 ** 32) >>> 0, talents, unlocks);
+    if (o.solo) s.solo = true;
     starterBase(s); // a small working settlement to start from
     if (o.debugWaves && o.debugWaves > 0) { s.waveCount = Math.min(s.waveCount, Math.floor(o.debugWaves)); s.debugWaves = s.waveCount; }
     return new Room(code, s);
   }
 
-  get connected() { return !!(this.sockets[0] && this.sockets[1]); }
-  get paused() { return !this.connected || this.away[0] || this.away[1]; }
+  get connected() { return this.state.solo ? !!this.sockets[0] : !!(this.sockets[0] && this.sockets[1]); }
+  get paused() { return !this.connected || this.away[0] || (!this.state.solo && this.away[1]); }
   get finished() { return this.state.phase !== 'play'; }
 
   join(ws: Socket, tok?: string): { you: PlayerId; token: string } | { error: string } {
@@ -64,7 +65,7 @@ export class Room {
     this.sockets[seat] = ws;
     this.away[seat] = false;
     this.lastActive = Date.now();
-    this.send(ws, { t: 'joined', code: this.code, you: seat, token: this.tokens[seat], mapId: this.state.mapId, v: PROTOCOL_VERSION });
+    this.send(ws, { t: 'joined', code: this.code, you: seat, token: this.tokens[seat], mapId: this.state.mapId, v: PROTOCOL_VERSION, solo: !!this.state.solo });
     this.broadcast({ t: 'peer', connected: this.connected });
     if (this.connected) this.everFull = true;
     this.sentRev = -1; // newcomers need the full structure list

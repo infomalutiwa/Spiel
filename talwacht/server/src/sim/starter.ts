@@ -71,9 +71,10 @@ export function starterBase(s: GameState) {
   const wall = wallIds.length ? structById(s, wallIds[Math.floor(wallIds.length / 2)]) : undefined;
   for (const p of [0, 1] as const) {
     const ax = (gx + (p ? 3 : -3) + 0.5) * CELL, ay = (wy + 3) * CELL;
-    const a = spawnSquad(s, p, 'archer', ax, ay);
+    const owner = s.solo ? 0 : p; // alone: you command both garrisons
+    const a = spawnSquad(s, owner, 'archer', ax, ay);
     if (wall) setOrder(s, a, 'wall', ax, ay, { structure: wall.id });
-    const sp = spawnSquad(s, p, 'spearman', (gx + (p ? 2 : -2) + 0.5) * CELL, (wy + 6) * CELL);
+    const sp = spawnSquad(s, owner, 'spearman', (gx + (p ? 2 : -2) + 0.5) * CELL, (wy + 6) * CELL);
     setOrder(s, sp, 'hold', (gx + (p ? 2 : -2) + 0.5) * CELL, (wy + 6) * CELL);
   }
   s.sRev++;
