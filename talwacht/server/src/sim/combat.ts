@@ -23,6 +23,8 @@ const RANGED: DmgKind[] = ['pierce', 'bolt'];
 export const isMounted = (u: Unit) => (isTroop(u.type) ? TROOPS[u.type].role === 'mounted' : !!ENEMIES[u.type].mounted);
 export const isHeavy = (u: Unit) => (isTroop(u.type) ? TROOPS[u.type].armor >= 6 : !!ENEMIES[u.type].heavy);
 export const armorOf = (s: GameState, u: Unit) => defOf(u.type).armor + (u.side === 'p' && s.research.includes('armor') ? 2 : 0);
+/** share of damage that gets through armour */
+export const armorFactor = (a: number) => 10 / (10 + 1.5 * a);
 export const squadOf = (s: GameState, u: Unit) => (u.squad ? s.squads.find(q => q.id === u.squad) : undefined);
 export const starMult = (s: GameState, u: Unit) => 1 + 0.08 * (squadOf(s, u)?.stars ?? 0);
 
@@ -46,7 +48,9 @@ export function damage(s: GameState, t: Unit, amount: number, kind: DmgKind, o: 
   }
   if (ARMORED.includes(kind)) {
     const pierce = o.pierce ?? (a ? (defOf(a.type) as { pierce?: number }).pierce ?? 0 : 0);
-    dmg *= 10 / (10 + armorOf(s, t) * (1 - pierce));
+    const ar = armorOf(s, t);
+    dmg *= armorFactor(ar * (1 - pierce));
+    if (kind === 'bolt' && ar <= 2) dmg *= 0.5; // bolts punch straight through light targets: wasted power
   }
   const ranged = o.ranged ?? RANGED.includes(kind);
   const sx = o.x ?? a?.x, sy = o.y ?? a?.y;

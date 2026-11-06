@@ -72,8 +72,8 @@ export const STRUCTURES: Record<StructId, StructDef> = {
 
   tower_bow: S({ id: 'tower_bow', name: 'Bogenturm', icon: '🏹', cat: 'tower', blurb: 'Viele schnelle Pfeile gegen leichte Gegner. Stufe 3: Brandpfeile.', w: 1, h: 1, hp: [700, 950, 1250], cost: res(60, 40), up: [res(30, 40, 0, 20), res(40, 60, 0, 40)], build: 20,
     tower: { shooters: [2, 3, 4], cd: [0.9, 0.9, 0.9], dmg: [11, 12, 13], range: [40, 42, 44], kind: 'pierce', burn: [[0, 0], [0, 0], [4, 3]], prefers: 'weakest' } }),
-  tower_xbow: S({ id: 'tower_xbow', name: 'Armbrustturm', icon: '🎯', cat: 'tower', blurb: 'Langsamer, aber jeder Bolzen durchschlägt Rüstung.', w: 1, h: 1, hp: [800, 1100], cost: res(80, 70, 0, 40), up: [res(40, 60, 0, 60)], build: 24,
-    tower: { shooters: [2, 3], cd: [2.2, 2.2], dmg: [36, 40], range: [46, 48], kind: 'bolt', pierce: 0.7, prefers: 'armored' } }),
+  tower_xbow: S({ id: 'tower_xbow', name: 'Armbrustturm', icon: '🎯', cat: 'tower', blurb: 'Langsamer, aber jeder Bolzen durchschlägt Rüstung.', w: 1, h: 1, hp: [800, 1100], cost: res(70, 40, 0, 20), up: [res(40, 60, 0, 60)], build: 24,
+    tower: { shooters: [2, 3], cd: [2.2, 2.2], dmg: [45, 50], range: [46, 48], kind: 'bolt', pierce: 0.7, prefers: 'armored' } }),
   ballista: S({ id: 'ballista', name: 'Ballista', icon: '🗡️', cat: 'tower', blurb: 'Riesenbolzen durchschlägt eine ganze Reihe – auch Schilde.', w: 1, h: 1, hp: [800, 1100], cost: res(100, 60, 0, 60), up: [res(60, 60, 0, 80)], build: 26, unlock: 'ballista',
     tower: { shooters: [1, 1], cd: [4, 4], dmg: [90, 120], range: [60, 62], kind: 'bolt', maxTargets: [6, 8], lineLen: 45, ignoresShields: true, prefers: 'line' } }),
   tower_catapult: S({ id: 'tower_catapult', name: 'Katapultturm', icon: '🪨', cat: 'tower', blurb: 'Großer Flächenschaden, sprengt Schildkröten auf. Braucht Stein.', w: 1, h: 1, hp: [900, 1200], cost: res(120, 120, 0, 60), up: [res(80, 80, 0, 80)], build: 30,

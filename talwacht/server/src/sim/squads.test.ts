@@ -3,7 +3,7 @@ import { cellOf, MAPS, type GameState, type Squad } from '@talwacht/shared';
 import { createGame, newStructure, structById } from './state';
 import { applyCommand } from './commands';
 import { spawnSquad, squadTick, trainTick, slotStruct } from './squads';
-import { combatTick, damage } from './combat';
+import { armorFactor, combatTick, damage } from './combat';
 import { tickMovement } from './movement';
 import { removeStructure } from './build';
 import { makeUnit } from './units';
@@ -67,8 +67,7 @@ describe('combat roles', () => {
     rider.hp = rider.maxHp = 10000; foot.hp = foot.maxHp = 10000;
     damage(s, rider, 14, 'spear', { attacker: sp }); damage(s, foot, 14, 'spear', { attacker: sp });
     const dr = 10000 - rider.hp, df = 10000 - foot.hp;
-    // armour: rider 3, raider 1 → 10/13 vs 10/11
-    expect(dr / (10 / 13)).toBeCloseTo(2.5 * (df / (10 / 11)), 3);
+    expect(dr / armorFactor(3)).toBeCloseTo(2.5 * (df / armorFactor(1)), 3);
   });
 });
 
